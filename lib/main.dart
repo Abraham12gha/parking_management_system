@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
 import 'login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+      const MyApp()
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -32,9 +37,7 @@ class _MyAppState extends State<MyApp> {
 
       themeMode: _themeMode,
 
-      home: LoginScreen(
-        onThemeChanged: changeTheme,
-      ),
+      home: LoginScreen(),
     );
   }
 }

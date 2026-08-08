@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "858291132203",
+    "project_id": "parking-management-syste-cf110",
+    "storage_bucket": "parking-management-syste-cf110.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:858291132203:android:848fa58d331eefcbae976e",
+        "android_client_info": {
+          "package_name": "com.example.parking_management_system"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcLQwhSdhnKq80KqvcE2vidbu1kQ0yrUc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
