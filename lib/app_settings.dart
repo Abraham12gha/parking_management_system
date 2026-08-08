@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'app_settings.dart';
 
-class LoginScreen extends StatelessWidget {
+class AppSettings extends StatelessWidget {
   final Function(bool) onThemeChanged;
 
-  const LoginScreen({
+  const AppSettings({
     super.key,
     required this.onThemeChanged,
   });
@@ -13,7 +12,7 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Pakistan Valet Solution"),
+        title: const Text("Settings"),
       ),
 
       body: Center(
@@ -21,27 +20,29 @@ class LoginScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              "Login",
+              "Settings",
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 30,
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
 
             ElevatedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AppSettings(
-                      onThemeChanged: onThemeChanged,
-                    ),
-                  ),
-                );
+                onThemeChanged(true);
               },
-              child: const Text("Settings"),
+              child: const Text("Dark Mode"),
+            ),
+
+            const SizedBox(height: 10),
+
+            ElevatedButton(
+              onPressed: () {
+                onThemeChanged(false);
+              },
+              child: const Text("Light Mode"),
             ),
           ],
         ),
