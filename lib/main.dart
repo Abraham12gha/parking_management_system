@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parking_management_system/auth_wrapper.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
 import 'login_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -40,7 +41,7 @@ class _MyAppState extends State<MyApp> {
 
       themeMode: _themeMode,
 
-      home: LoginScreen(),
+      home: AuthWrapper(),
     );
   }
 }

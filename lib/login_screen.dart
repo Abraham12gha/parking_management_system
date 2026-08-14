@@ -14,18 +14,20 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
-  final Auth auth = Auth();
-  bool isLoading = false;
+  final Auth _auth = Auth();
+  
+  
 
+  bool _isLoading = false;
   bool hidePassword = true;
 
   @override
   void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -34,8 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String buildNumber = '';
 
 
-  String? emailError;
-  String? passwordError;
+  String? _emailError;
+  String? _passwordError;
 
   @override
   void initState() {
@@ -121,49 +123,185 @@ class _LoginScreenState extends State<LoginScreen> {
 
 
                         TextField(
-                          controller: emailController,
+                          controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+
                           decoration: InputDecoration(
                             labelText: 'Email',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            border: const OutlineInputBorder(),
-                            errorText: emailError,
+
+                            // Keep label visible
+                            floatingLabelBehavior: FloatingLabelBehavior.auto,
+
+                            labelStyle: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.onSurface.withValues(alpha: 0.7),
+                            ),
+
+                            floatingLabelStyle: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.primary,
+                            ),
+
+                            prefixIcon: Icon(
+                              Icons.email_outlined,
+                              color: colors.onSurface.withValues(alpha: 0.7),
+                            ),
+
+                            errorText: _emailError,
+
+                            errorStyle: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: colors.primary,
+                                width: 2,
+                              ),
+                            ),
+
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Colors.red,
+                                width: 1.5,
+                              ),
+                            ),
+
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Colors.red,
+                                width: 2,
+                              ),
+                            ),
                           ),
+
                           onChanged: (_) {
-                            if (emailError != null) {
+                            if (_emailError != null) {
                               setState(() {
-                                emailError = null;
+                                _emailError = null;
                               });
                             }
                           },
                         ),
+
+
                         const SizedBox(height: 16),
 
                         TextField(
-                          controller: passwordController,
+                          controller: _passwordController,
                           obscureText: hidePassword,
+
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            border: const OutlineInputBorder(),
-                            errorText: passwordError,
+
+                            floatingLabelBehavior: FloatingLabelBehavior.auto,
+
+                            labelStyle: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.onSurface.withValues(alpha: 0.7),
+                            ),
+
+                            floatingLabelStyle: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: colors.primary,
+                            ),
+
+                            prefixIcon: Icon(
+                              Icons.lock_outline,
+                              color: colors.onSurface.withValues(alpha: 0.7),
+                            ),
+
+                            errorText: _passwordError,
+
+                            errorStyle: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
+                            ),
+
                             suffixIcon: IconButton(
+                              tooltip: hidePassword
+                                  ? 'Show password'
+                                  : 'Hide password',
+
                               icon: Icon(
                                 hidePassword
                                     ? Icons.visibility_outlined
                                     : Icons.visibility_off_outlined,
+                                color: colors.onSurface.withValues(alpha: 0.7),
                               ),
+
                               onPressed: () {
                                 setState(() {
                                   hidePassword = !hidePassword;
                                 });
                               },
                             ),
+
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                            ),
+
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: colors.primary,
+                                width: 2,
+                              ),
+                            ),
+
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Colors.red,
+                                width: 1.5,
+                              ),
+                            ),
+
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Colors.red,
+                                width: 2,
+                              ),
+                            ),
                           ),
+
                           onChanged: (_) {
-                            if (passwordError != null) {
+                            if (_passwordError != null) {
                               setState(() {
-                                passwordError = null;
+                                _passwordError = null;
                               });
                             }
                           },
@@ -174,130 +312,99 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: isLoading
+                            onPressed: _isLoading
                                 ? null
                                 : () async {
-                              final email = emailController.text.trim();
-                              final password = passwordController.text;
-
-                              // Clear previous errors
                               setState(() {
-                                emailError = null;
-                                passwordError = null;
+                                _emailError = null;
+                                _passwordError = null;
                               });
 
-                              // Validate email
-                              if (email.isEmpty) {
-                                setState(() {
-                                  emailError = 'Email field is empty.';
-                                });
+                              bool hasError = false;
+
+                              if (_emailController.text.trim().isEmpty) {
+                                _emailError = 'Email is required';
+                                hasError = true;
                               }
 
-                              // Validate password
-                              if (password.isEmpty) {
-                                setState(() {
-                                  passwordError = 'Password field is empty.';
-                                });
+                              if (_passwordController.text.isEmpty) {
+                                _passwordError = 'Password is required';
+                                hasError = true;
                               }
 
-                              // Stop if validation failed
-                              if (email.isEmpty || password.isEmpty) {
-                                return;
-                              }
+                              setState(() {});
 
-                              // Show loading
-                              setState(() {
-                                isLoading = true;
-                              });
+                              if (hasError) return;
 
                               try {
-                                final result = await auth.login(
-                                  email,
-                                  password,
+                                setState(() {
+                                  _isLoading = true;
+                                });
+
+                                await _auth.login(
+                                  _emailController.text.trim(),
+                                  _passwordController.text,
                                 );
 
-                                if (!mounted) return;
-
-                                final role = result?['role'];
-
-                                debugPrint('Login successful');
-                                debugPrint('Role: $role');
-
-                                if (role == 'admin') {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const AdminDashboard(),
-                                    ),
-                                  );
-                                } else if (role == 'operator') {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const OperatorDashboard(),
-                                    ),
-                                  );
-                                } else {
-                                  await auth.logout();
-
-                                  setState(() {
-                                    emailError = 'Invalid user role.';
-                                  });
-                                }
                               } on FirebaseAuthException catch (e) {
+
+                                debugPrint('Firebase Error: ${e.code}');
+                                debugPrint('Firebase Message: ${e.message}');
+
                                 if (!mounted) return;
 
                                 setState(() {
                                   switch (e.code) {
                                     case 'user-not-found':
-                                      emailError = 'This email does not exist.';
+                                      _emailError =
+                                      'No account found with this email.';
                                       break;
 
                                     case 'wrong-password':
-                                      passwordError = 'Password is wrong.';
-                                      break;
-
-                                    case 'invalid-credential':
-                                      emailError = 'Email or password is incorrect.';
+                                      _passwordError =
+                                      'Incorrect password.';
                                       break;
 
                                     case 'invalid-email':
-                                      emailError = 'Please enter a valid email address.';
+                                      _emailError =
+                                      'Please enter a valid email address.';
+                                      break;
+
+                                    case 'invalid-credential':
+                                      _passwordError =
+                                      'Invalid email or password.';
                                       break;
 
                                     case 'user-disabled':
-                                      emailError = 'This account has been disabled.';
+                                      _emailError =
+                                      'This account has been disabled.';
                                       break;
 
                                     case 'too-many-requests':
-                                      passwordError =
-                                      'Too many attempts. Please try again later.';
+                                      _passwordError =
+                                      'Too many login attempts. Please try again later.';
                                       break;
 
                                     case 'network-request-failed':
-                                      emailError = 'Network error. Please try again.';
+                                      _passwordError =
+                                      'Network error. Check your internet connection.';
                                       break;
 
                                     default:
-                                      emailError = e.message ?? 'Login failed.';
+                                      _passwordError =
+                                      'Login failed. Please try again.';
                                   }
                                 });
-                              } catch (e) {
-                                if (!mounted) return;
 
-                                setState(() {
-                                  emailError = 'Something went wrong. Please try again.';
-                                });
-
-                                debugPrint('Login error: $e');
                               } finally {
                                 if (mounted) {
                                   setState(() {
-                                    isLoading = false;
+                                    _isLoading = false;
                                   });
                                 }
                               }
                             },
+
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colors.primary,
                               foregroundColor: colors.onPrimary,
@@ -305,7 +412,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            child: isLoading
+                            child: _isLoading
                                 ? SizedBox(
                               height: 22,
                               width: 22,
