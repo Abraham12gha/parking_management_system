@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/auth_wrapper.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
-import 'login_screen.dart';
+import 'package:parking_management_system/resources/widget/internet_connection_banner.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -41,7 +41,9 @@ class _MyAppState extends State<MyApp> {
 
       themeMode: _themeMode,
 
-      home: AuthWrapper(),
+      home: InternetConnectionBanner(
+          child: AuthWrapper()
+      ),
     );
   }
 }
