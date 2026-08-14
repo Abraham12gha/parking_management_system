@@ -33,6 +33,10 @@ class _LoginScreenState extends State<LoginScreen> {
   String appVersion = '';
   String buildNumber = '';
 
+
+  String? emailError;
+  String? passwordError;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding: const EdgeInsets.all(40),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 380),
+
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -117,11 +122,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         TextField(
                           controller: emailController,
-                          decoration: const InputDecoration(
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
                             labelText: 'Email',
-                            prefixIcon: Icon(Icons.email_outlined),
-                            border: OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: const OutlineInputBorder(),
+                            errorText: emailError,
                           ),
+                          onChanged: (_) {
+                            if (emailError != null) {
+                              setState(() {
+                                emailError = null;
+                              });
+                            }
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -132,6 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
                             border: const OutlineInputBorder(),
+                            errorText: passwordError,
                             suffixIcon: IconButton(
                               icon: Icon(
                                 hidePassword
@@ -145,6 +160,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
                           ),
+                          onChanged: (_) {
+                            if (passwordError != null) {
+                              setState(() {
+                                passwordError = null;
+                              });
+                            }
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -158,13 +180,28 @@ class _LoginScreenState extends State<LoginScreen> {
                               final email = emailController.text.trim();
                               final password = passwordController.text;
 
-                              // Validate fields
+                              // Clear previous errors
+                              setState(() {
+                                emailError = null;
+                                passwordError = null;
+                              });
+
+                              // Validate email
+                              if (email.isEmpty) {
+                                setState(() {
+                                  emailError = 'Email field is empty.';
+                                });
+                              }
+
+                              // Validate password
+                              if (password.isEmpty) {
+                                setState(() {
+                                  passwordError = 'Password field is empty.';
+                                });
+                              }
+
+                              // Stop if validation failed
                               if (email.isEmpty || password.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter email and password'),
-                                  ),
-                                );
                                 return;
                               }
 
@@ -174,7 +211,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               });
 
                               try {
-                                // Login with Firebase
                                 final result = await auth.login(
                                   email,
                                   password,
@@ -182,13 +218,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                 if (!mounted) return;
 
-                                // Get role from Firestore
                                 final role = result?['role'];
 
                                 debugPrint('Login successful');
                                 debugPrint('Role: $role');
 
-                                // Navigate based on role
                                 if (role == 'admin') {
                                   Navigator.pushReplacement(
                                     context,
@@ -204,62 +238,58 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   );
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Invalid user role'),
-                                    ),
-                                  );
-
-                                  // Logout if role is invalid
                                   await auth.logout();
+
+                                  setState(() {
+                                    emailError = 'Invalid user role.';
+                                  });
                                 }
                               } on FirebaseAuthException catch (e) {
                                 if (!mounted) return;
 
-                                String message;
+                                setState(() {
+                                  switch (e.code) {
+                                    case 'user-not-found':
+                                      emailError = 'This email does not exist.';
+                                      break;
 
-                                switch (e.code) {
-                                  case 'invalid-credential':
-                                    message = 'Invalid email or password.';
-                                    break;
+                                    case 'wrong-password':
+                                      passwordError = 'Password is wrong.';
+                                      break;
 
-                                  case 'user-not-found':
-                                    message = 'No account found with this email.';
-                                    break;
+                                    case 'invalid-credential':
+                                      emailError = 'Email or password is incorrect.';
+                                      break;
 
-                                  case 'wrong-password':
-                                    message = 'Incorrect password.';
-                                    break;
+                                    case 'invalid-email':
+                                      emailError = 'Please enter a valid email address.';
+                                      break;
 
-                                  case 'invalid-email':
-                                    message = 'Please enter a valid email address.';
-                                    break;
+                                    case 'user-disabled':
+                                      emailError = 'This account has been disabled.';
+                                      break;
 
-                                  case 'user-disabled':
-                                    message = 'This account has been disabled.';
-                                    break;
+                                    case 'too-many-requests':
+                                      passwordError =
+                                      'Too many attempts. Please try again later.';
+                                      break;
 
-                                  case 'too-many-requests':
-                                    message = 'Too many attempts. Please try again later.';
-                                    break;
+                                    case 'network-request-failed':
+                                      emailError = 'Network error. Please try again.';
+                                      break;
 
-                                  default:
-                                    message = e.message ?? 'Login failed.';
-                                }
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(message),
-                                  ),
-                                );
+                                    default:
+                                      emailError = e.message ?? 'Login failed.';
+                                  }
+                                });
                               } catch (e) {
                                 if (!mounted) return;
 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Something went wrong: $e'),
-                                  ),
-                                );
+                                setState(() {
+                                  emailError = 'Something went wrong. Please try again.';
+                                });
+
+                                debugPrint('Login error: $e');
                               } finally {
                                 if (mounted) {
                                   setState(() {
