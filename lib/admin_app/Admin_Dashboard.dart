@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parking_management_system/admin_app/settings_admin.dart';
 import 'admin_appbar.dart';
 import 'admin_sideBar.dart';
 import 'dashboard_screen.dart';
@@ -19,9 +20,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   static const List<String> _titles = [
     'Dashboard',
     'Operator',
-    'Products',
-    'Orders',
+    'Locations',
+    'Payment',
     'Analytics',
+    'Request',
     'Settings',
   ];
 
@@ -32,7 +34,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     DashboardScreen(),
     DashboardScreen(),
     DashboardScreen(),
-    DashboardScreen(),
+    SettingsScreen()
   ];
 
   void _onItemSelected(int index) {

@@ -1,52 +1,31 @@
-import 'package:flutter/material.dart';
-
-class AppSettings extends StatelessWidget {
-  final Function(bool) onThemeChanged;
+class AppSettings {
+  final String appName;
+  final String? logoUrl;
+  final String? email;
+  final String? phone;
 
   const AppSettings({
-    super.key,
-    required this.onThemeChanged,
+    this.appName = 'My Admin App',
+    this.logoUrl,
+    this.email,
+    this.phone,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Settings"),
-      ),
-
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              "Settings",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 30,
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            ElevatedButton(
-              onPressed: () {
-                onThemeChanged(true);
-              },
-              child: const Text("Dark Mode"),
-            ),
-
-            const SizedBox(height: 10),
-
-            ElevatedButton(
-              onPressed: () {
-                onThemeChanged(false);
-              },
-              child: const Text("Light Mode"),
-            ),
-          ],
-        ),
-      ),
+  factory AppSettings.fromMap(Map<String, dynamic> map) {
+    return AppSettings(
+      appName: map['appName'] as String? ?? 'My Admin App',
+      logoUrl: map['logoUrl'] as String?,
+      email: map['email'] as String?,
+      phone: map['phone'] as String?,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'appName': appName,
+      'logoUrl': logoUrl,
+      'email': email,
+      'phone': phone,
+    };
   }
 }

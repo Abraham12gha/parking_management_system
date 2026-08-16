@@ -3,6 +3,8 @@ import 'package:parking_management_system/auth_wrapper.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
 import 'package:parking_management_system/resources/widget/internet_connection_banner.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:parking_management_system/theme_controller.dart';
+import 'app_settings.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -33,17 +35,21 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<ThemeMode>(
+        valueListenable: ThemeController.themeMode,
+        builder: (context, mode, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
 
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
 
-      themeMode: _themeMode,
-
-      home: InternetConnectionBanner(
+            themeMode: mode,
+            home: InternetConnectionBanner(
           child: AuthWrapper()
-      ),
+            )
+            );
+          },
     );
   }
 }
