@@ -36,36 +36,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _merchantIdController.dispose();
     super.dispose();
   }
-
-  // Future<void> _pickLogo() async {
-  //   try {
-  //     final picker = ImagePicker();
-  //
-  //     final picked = await picker.pickImage(
-  //       source: ImageSource.gallery,
-  //       imageQuality: 85,
-  //     );
-  //
-  //     if (picked == null) return;
-  //
-  //     final bytes = await picked.readAsBytes();
-  //
-  //     if (!mounted) return;
-  //
-  //     setState(() {
-  //       _logoBytes = bytes;
-  //     });
-  //
-  //     _showMessage('Logo selected');
-  //   } catch (e) {
-  //     if (!mounted) return;
-  //
-  //     _showMessage(
-  //       'Could not pick image: $e',
-  //       isError: true,
-  //     );
-  //   }
-  // }
   Future<void> _pickLogo() async {
     try {
       final picker = ImagePicker();

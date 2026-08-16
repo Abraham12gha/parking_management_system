@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
 import '../login_screen.dart';
 import '../services/auth.dart';
@@ -34,7 +35,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   final List<Widget> _pages = [
     DashboardScreen(),
-    DashboardScreen(),
+    AddOperator(),
     DashboardScreen(),
     DashboardScreen(),
     DashboardScreen(),
