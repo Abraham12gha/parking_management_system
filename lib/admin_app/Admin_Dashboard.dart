@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
+import '../login_screen.dart';
+import '../services/auth.dart';
 import 'admin_appbar.dart';
 import 'admin_sideBar.dart';
 import 'dashboard_screen.dart';
@@ -13,6 +15,9 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final Auth _auth = Auth();
+
+
   int _selectedIndex = 0;
 
   static const double _desktopBreakpoint = 1000;
@@ -44,6 +49,60 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  Future<void> _handleLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text(
+            'Are you sure you want to logout?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout != true) return;
+
+    try {
+      await _auth.logout();
+
+      if (!mounted) return;
+
+      // Go back to the login screen.
+      // Replace LoginScreen() with your actual login screen widget.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+            (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not logout: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -67,6 +126,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 AdminSidebar(
                   selectedIndex: _selectedIndex,
                   onItemSelected: _onItemSelected,
+                  onLogout: _handleLogout,
                 ),
               Expanded(
                 child: Column(

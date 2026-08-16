@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:parking_management_system/services/auth.dart';
+import 'package:parking_management_system/services/company_settings_service.dart';
 import 'admin_app/Admin_Dashboard.dart';
 import 'company-data/company_info.dart';
 import 'operator_app/operator_dashboard.dart';
@@ -18,8 +19,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   final Auth _auth = Auth();
-  
-  
+
+  String _companyName = 'Pakistan Valet Solution';
+  String? _logoUrl;
 
   bool _isLoading = false;
   bool hidePassword = true;
@@ -43,6 +45,33 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     loadAppVersion();
+    _loadCompanySettings();
+  }
+  Future<void> _loadCompanySettings() async {
+    try {
+      final settings =
+      await CompanySettingsService.instance.getSettings();
+
+      if (!mounted) return;
+
+      setState(() {
+        _companyName = settings.appName.isNotEmpty
+            ? settings.appName
+            : 'Pakistan Valet Solution';
+
+        _logoUrl = settings.logoUrl;
+      });
+    } catch (e) {
+      debugPrint('Could not load company settings: $e');
+
+      // Keep default values.
+      if (!mounted) return;
+
+      setState(() {
+        _companyName = 'Pakistan Valet Solution';
+        _logoUrl = null;
+      });
+    }
   }
 
   Future<void> loadAppVersion() async {
@@ -88,14 +117,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
 
-                        Image.asset(
-                          company.logo,
+                        _logoUrl != null && _logoUrl!.isNotEmpty
+                            ? Image.network(
+                          _logoUrl!,
+                          height: 70,
+                          errorBuilder: (context, error, stackTrace) {
+                            debugPrint('Could not load company logo: $error');
+
+                            return Image.asset(
+                              'assets/images/PVS_LOGO.png',
+                              height: 70,
+                            );
+                          },
+                        )
+                            : Image.asset(
+                          'assets/images/PVS_LOGO.png',
                           height: 70,
                         ),
+
                         const SizedBox(height: 16),
 
                         Text(
-                          company.name,
+                          _companyName,
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
