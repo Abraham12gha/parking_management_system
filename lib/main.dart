@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/auth_wrapper.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
@@ -9,6 +10,7 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -43,6 +45,7 @@ class _MyAppState extends State<MyApp> {
 
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
+
 
             themeMode: mode,
             home: InternetConnectionBanner(
