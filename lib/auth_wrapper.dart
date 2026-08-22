@@ -4,7 +4,7 @@ import 'package:parking_management_system/services/auth.dart';
 
 
 import '../admin_app/Admin_Dashboard.dart';
-import '../operator_app/operator_dashboard.dart';
+import '../operator_app/operator_dashboard.dart' hide AdminDashboard;
 import 'login_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -83,9 +83,9 @@ class RoleBasedScreen extends StatelessWidget {
         switch (role) {
           case 'admin':
             return const AdminDashboard();
-
           case 'operator':
             return const OperatorDashboard();
+
 
           default:
             return const Scaffold(
