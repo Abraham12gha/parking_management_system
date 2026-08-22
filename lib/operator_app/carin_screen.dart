@@ -1,26 +1,5 @@
 import 'package:flutter/material.dart';
-
-// ============================================================
-// CarinScreen
-// ------------------------------------------------------------
-// The "New Vehicle Entry" popup shown when the operator taps
-// the "CAR IN" button on the dashboard.
-//
-// This is frontend-only: category selection is handled with
-// local state, and the form fields don't validate/submit to
-// any backend yet. Look for the TODO comments to see where
-// you'd hook things up later (ticket number generation, save
-// to Firestore, printing, etc).
-//
-// How to show it:
-//
-//   showDialog(
-//     context: context,
-//     builder: (context) => const CarinScreen(),
-//   );
-// ============================================================
-
-// The 3 vehicle categories the operator can pick from.
+import 'package:intl/intl.dart';
 enum VehicleCategory { bike, selfParking, valetParking }
 
 class CarinScreen extends StatefulWidget {
@@ -35,8 +14,6 @@ class CarinScreen extends StatefulWidget {
 }
 
 class _CarinScreenState extends State<CarinScreen> {
-  // Which category card is currently selected.
-  // Defaults to Valet Parking, matching the design.
   VehicleCategory _selectedCategory = VehicleCategory.valetParking;
 
   // Controllers for the form fields.
@@ -117,9 +94,6 @@ class _CarinScreenState extends State<CarinScreen> {
               ),
               _DialogFooter(
                 onCancel: widget.onBack,
-                onPrintTicket: () {
-                  // TODO: Send the generated ticket to the printer.
-                },
                 onGenerateTicket: () {
                   // TODO: Validate fields, create the vehicle entry
                   // record, and save it (e.g. to Firestore).
@@ -172,11 +146,9 @@ class _DialogHeader extends StatelessWidget {
                 const SizedBox(height: 8),
                 // TODO: Replace these placeholder values with the
                 // real ticket number, timestamp, and logged-in
-                // operator name.
-                const _HeaderMetaRow(
+                _HeaderMetaRow(
                   ticketNumber: 'TKT-9001',
-                  dateTime: '10:30 AM, Oct 24, 2023',
-                  operatorName: 'John Doe',
+                  dateTime: DateFormat('h:mm a, MMM dd, yyyy').format(DateTime.now()),
                 ),
               ],
             ),
@@ -195,12 +167,10 @@ class _DialogHeader extends StatelessWidget {
 class _HeaderMetaRow extends StatelessWidget {
   final String ticketNumber;
   final String dateTime;
-  final String operatorName;
 
   const _HeaderMetaRow({
     required this.ticketNumber,
     required this.dateTime,
-    required this.operatorName,
   });
 
   @override
@@ -223,12 +193,6 @@ class _HeaderMetaRow extends StatelessWidget {
         const Icon(Icons.access_time, size: 15, color: Color(0xFF616161)),
         const SizedBox(width: 4),
         Text(dateTime, style: textStyle),
-        dotSpacing,
-        const Text('•', style: textStyle),
-        dotSpacing,
-        const Icon(Icons.person_outline, size: 15, color: Color(0xFF616161)),
-        const SizedBox(width: 4),
-        Text('Operator: $operatorName', style: textStyle),
       ],
     );
   }
@@ -503,12 +467,10 @@ class _FormField extends StatelessWidget {
 // ============================================================
 class _DialogFooter extends StatelessWidget {
   final VoidCallback onCancel;
-  final VoidCallback onPrintTicket;
   final VoidCallback onGenerateTicket;
 
   const _DialogFooter({
     required this.onCancel,
-    required this.onPrintTicket,
     required this.onGenerateTicket,
   });
 
@@ -519,16 +481,15 @@ class _DialogFooter extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: Colors.transparent,
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(16),
           bottomRight: Radius.circular(16),
         ),
       ),
-      child: Wrap(
-        alignment: WrapAlignment.end,
+      child: Row(
+        mainAxisAlignment: .start,
         spacing: 12,
-        runSpacing: 12,
         children: [
           OutlinedButton(
             onPressed: onCancel,
@@ -542,19 +503,6 @@ class _DialogFooter extends StatelessWidget {
             ),
             child: const Text('Cancel'),
           ),
-          OutlinedButton.icon(
-            onPressed: onPrintTicket,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              side: BorderSide(color: theme.colorScheme.primary),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.print_outlined, size: 18),
-            label: const Text('Print Ticket'),
-          ),
           ElevatedButton.icon(
             onPressed: onGenerateTicket,
             style: ElevatedButton.styleFrom(
@@ -566,8 +514,8 @@ class _DialogFooter extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            icon: const Icon(Icons.add_circle_outline, size: 18),
-            label: const Text('Generate Ticket'),
+            icon: const Icon(Icons.local_print_shop_outlined, size: 18),
+            label: const Text('Generate + Print'),
           ),
         ],
       ),

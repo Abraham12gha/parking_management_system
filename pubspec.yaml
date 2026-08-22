@@ -42,6 +42,7 @@ dependencies:
   window_manager: ^0.5.2
   image_picker: ^1.2.3
   http: ^1.6.0
+  intl: ^0.20.3
 
 
 dev_dependencies:

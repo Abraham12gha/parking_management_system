@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
+import 'package:parking_management_system/operator_app/settings_operator.dart';
 import '../login_screen.dart';
 import '../services/auth.dart';
 import 'carin_screen.dart';
@@ -41,7 +42,55 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
   ];
 
   void _onItemSelected(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+
+      switch (index) {
+        case 0:
+          _currentPage = null; // Dashboard
+          break;
+
+        case 1:
+          _currentPage = const _PlaceholderPage(
+            icon: Icons.directions_car,
+            label: 'Active Vehicles',
+          );
+          break;
+
+        case 2:
+          _currentPage = const _PlaceholderPage(
+            icon: Icons.assessment,
+            label: 'Reports',
+          );
+          break;
+
+        case 3:
+          _currentPage = const _PlaceholderPage(
+            icon: Icons.payment,
+            label: 'Payment',
+          );
+          break;
+
+        case 4:
+          _currentPage = const _PlaceholderPage(
+            icon: Icons.analytics,
+            label: 'Analytics',
+          );
+          break;
+
+        case 5:
+          _currentPage = const _PlaceholderPage(
+            icon: Icons.backup,
+            label: 'Backup',
+          );
+          break;
+
+        case 6:
+          _currentPage = const SettingScreenOperator();
+          break;
+      }
+    });
+
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       Navigator.of(context).pop();
     }
@@ -142,7 +191,6 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
                   children: [
                     OperatorAppbar(
                       title: _currentTitle,
-                      onMenuTap: isDesktop ? null : () => _scaffoldKey.currentState?.openDrawer(),
                     ),
                     Expanded(
                       child: Container(
