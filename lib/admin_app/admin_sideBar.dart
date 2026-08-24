@@ -12,13 +12,6 @@ class SidebarItem {
     required this.label,
   });
 }
-
-/// A polished, reusable admin panel sidebar.
-///
-/// It doesn't manage navigation itself — it just reports the tapped
-/// index via [onItemSelected]. The parent (Admin_Dashboard.dart) decides
-/// what to show, which is what keeps the shell (sidebar + app bar) fixed
-/// while only the inner content changes.
 class AdminSidebar extends StatelessWidget {
   const AdminSidebar({
     super.key,

@@ -3,6 +3,7 @@ import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
 import '../login_screen.dart';
 import '../services/auth.dart';
+import 'add_location.dart';
 import 'admin_appbar.dart';
 import 'admin_sideBar.dart';
 import 'dashboard_screen.dart';
@@ -36,7 +37,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final List<Widget> _pages = [
     DashboardScreen(),
     AddOperator(),
-    DashboardScreen(),
+    AddLocationAdmin(),
     DashboardScreen(),
     DashboardScreen(),
     DashboardScreen(),

@@ -461,10 +461,6 @@ class _FormField extends StatelessWidget {
   }
 }
 
-// ============================================================
-// Footer: Cancel / Print Ticket / Generate Ticket buttons,
-// right-aligned.
-// ============================================================
 class _DialogFooter extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onGenerateTicket;
@@ -488,7 +484,7 @@ class _DialogFooter extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisAlignment: .start,
+        mainAxisAlignment: .end,
         spacing: 12,
         children: [
           OutlinedButton(

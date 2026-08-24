@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth.dart';
+import '../services/location_service.dart';
 
 class AddOperator extends StatefulWidget {
   const AddOperator({super.key});
@@ -11,6 +12,8 @@ class AddOperator extends StatefulWidget {
 }
 
 class _AddOperatorState extends State<AddOperator> {
+  final LocationService _locationService = LocationService();
+  String? _selectedLocation;
   final Auth _auth = Auth();
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
@@ -19,7 +22,6 @@ class _AddOperatorState extends State<AddOperator> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _locationController = TextEditingController();
 
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
@@ -30,7 +32,6 @@ class _AddOperatorState extends State<AddOperator> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _locationController.dispose();
     super.dispose();
   }
 
@@ -45,7 +46,7 @@ class _AddOperatorState extends State<AddOperator> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final location = _locationController.text.trim();
+    final location = _selectedLocation!;
 
     setState(() {
       _isLoading = true;
@@ -120,17 +121,17 @@ class _AddOperatorState extends State<AddOperator> {
   }
 
   void _clearForm() {
-    _nameController.clear();
-    _emailController.clear();
-    _passwordController.clear();
-    _confirmPasswordController.clear();
-    _locationController.clear();
-
-    _formKey.currentState?.reset();
-
     FocusScope.of(context).unfocus();
 
-    setState(() {});
+    setState(() {
+      _nameController.clear();
+      _emailController.clear();
+      _passwordController.clear();
+      _confirmPasswordController.clear();
+      _selectedLocation = null;
+    });
+
+    _formKey.currentState?.reset();
   }
 
   @override
@@ -257,19 +258,89 @@ class _AddOperatorState extends State<AddOperator> {
                   const SizedBox(height: 18),
 
                   _buildLabel('Location'),
-                  TextFormField(
-                    controller: _locationController,
-                    decoration: _fieldDecoration(
-                      hint: 'e.g. Karachi, Pakistan',
-                      icon: Icons.location_on_outlined,
-                    ),
-                    validator: (value) {
-                      if (value == null || value
-                          .trim()
-                          .isEmpty) {
-                        return 'Please enter a location';
+                  StreamBuilder<List<String>>(
+                    stream: _locationService.getLocationNames(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Text(
+                          'Unable to load locations',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 13,
+                          ),
+                        );
                       }
-                      return null;
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return InputDecorator(
+                          decoration: _fieldDecoration(
+                            hint: 'Loading locations...',
+                            icon: Icons.location_on_outlined,
+                          ),
+                          child: const SizedBox(
+                            height: 20,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      final locations = snapshot.data ?? [];
+
+                      if (locations.isEmpty) {
+                        return InputDecorator(
+                          decoration: _fieldDecoration(
+                            hint: 'No locations available',
+                            icon: Icons.location_on_outlined,
+                          ),
+                          child: Text(
+                            'No locations available',
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.5),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return DropdownButtonFormField<String>(
+                        key: ValueKey(_selectedLocation),
+                        initialValue: _selectedLocation,
+                        decoration: _fieldDecoration(
+                          hint: 'Select a location',
+                          icon: Icons.location_on_outlined,
+                        ),
+                        items: locations.map((location) {
+                          return DropdownMenuItem<String>(
+                            value: location,
+                            child: Text(location),
+                          );
+                        }).toList(),
+                        onChanged: _isLoading
+                            ? null
+                            : (value) {
+                          setState(() {
+                            _selectedLocation = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please select a location';
+                          }
+
+                          return null;
+                        },
+                      );
                     },
                   ),
                   const SizedBox(height: 30),
