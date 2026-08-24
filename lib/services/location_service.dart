@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../app_model/location_model.dart';
+
 class LocationService {
   LocationService({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -17,14 +19,19 @@ class LocationService {
     });
   }
 
-  Stream<List<String>> getLocationNames() {
+  Stream<List<LocationModel>> getLocations() {
     return _firestore
         .collection('locations')
         .orderBy('locationName')
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-          .map((doc) => doc.data()['locationName'] as String)
+          .map(
+            (doc) => LocationModel.fromFirestore(
+          doc.id,
+          doc.data(),
+        ),
+      )
           .toList(),
     );
   }
