@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../app_model/location_model.dart';
 import '../services/auth.dart';
 import '../services/location_service.dart';
 
@@ -13,7 +14,7 @@ class AddOperator extends StatefulWidget {
 
 class _AddOperatorState extends State<AddOperator> {
   final LocationService _locationService = LocationService();
-  String? _selectedLocation;
+  LocationModel? _selectedLocation;
   final Auth _auth = Auth();
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
@@ -57,7 +58,7 @@ class _AddOperatorState extends State<AddOperator> {
         name,
         email,
         password,
-        location,
+        location.locationName,
       );
 
       if (!mounted) return;
@@ -258,8 +259,8 @@ class _AddOperatorState extends State<AddOperator> {
                   const SizedBox(height: 18),
 
                   _buildLabel('Location'),
-                  StreamBuilder<List<String>>(
-                    stream: _locationService.getLocationNames(),
+                  StreamBuilder<List<LocationModel>>(
+                    stream: _locationService.getLocations(),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return Text(
@@ -313,17 +314,17 @@ class _AddOperatorState extends State<AddOperator> {
                         );
                       }
 
-                      return DropdownButtonFormField<String>(
-                        key: ValueKey(_selectedLocation),
+                      return DropdownButtonFormField<LocationModel>(
+                        key: ValueKey(_selectedLocation?.id),
                         initialValue: _selectedLocation,
                         decoration: _fieldDecoration(
                           hint: 'Select a location',
                           icon: Icons.location_on_outlined,
                         ),
                         items: locations.map((location) {
-                          return DropdownMenuItem<String>(
+                          return DropdownMenuItem<LocationModel>(
                             value: location,
-                            child: Text(location),
+                            child: Text(location.locationName),
                           );
                         }).toList(),
                         onChanged: _isLoading
@@ -334,7 +335,7 @@ class _AddOperatorState extends State<AddOperator> {
                           });
                         },
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
+                          if (value == null) {
                             return 'Please select a location';
                           }
 
