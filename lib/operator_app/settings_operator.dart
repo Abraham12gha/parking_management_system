@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme_controller.dart';
@@ -11,6 +13,13 @@ class SettingScreenOperator extends StatefulWidget {
 }
 
 class _SettingScreenOperatorState extends State<SettingScreenOperator> {
+
+  String _operatorName = 'Loading...';
+  String _operatorEmail = 'Loading...';
+  String _operatorLocation = 'Loading...';
+  bool _loadingOperatorInfo = true;
+  // Branding
+  final _appNameController = TextEditingController(text: 'My Admin App');
 
   Uint8List? _logoBytes;
   String? _logoUrl;
@@ -78,6 +87,111 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
   }
 
 
+  Future<int?> _getParkingCharges() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return null;
+    }
+
+    // Get the operator's user document
+    final userDocument = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDocument.exists) {
+      return null;
+    }
+
+    final userData = userDocument.data();
+
+    final locationId = userData?['location'];
+
+    if (locationId == null || locationId.toString().isEmpty) {
+      return null;
+    }
+
+    // Get the location document using the locationId
+    final locationDocument = await FirebaseFirestore.instance
+        .collection('locations')
+        .doc(locationId)
+        .get();
+
+    if (!locationDocument.exists) {
+      return null;
+    }
+
+    final locationData = locationDocument.data();
+
+    final charges = locationData?['parkingCharges'];
+
+    if (charges == null) {
+      return null;
+    }
+
+    return (charges as num).toInt();
+  }
+
+
+
+  Future<void> _loadOperatorInfo() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _operatorName = 'Not available';
+          _operatorEmail = 'Not available';
+          _operatorLocation = 'Not available';
+          _loadingOperatorInfo = false;
+        });
+
+        return;
+      }
+
+      final userDocument = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDocument.data();
+
+      if (!mounted) return;
+
+      setState(() {
+        _operatorName =
+            userData?['name']?.toString() ??
+                user.displayName ??
+                'Not available';
+
+        _operatorEmail =
+            user.email ?? 'Not available';
+
+        _operatorLocation =
+            userData?['location']?.toString() ??
+                'Not available';
+
+        _loadingOperatorInfo = false;
+      });
+    } catch (e) {
+      debugPrint('LOAD OPERATOR INFO ERROR: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _operatorName = 'Not available';
+        _operatorEmail = 'Not available';
+        _operatorLocation = 'Not available';
+        _loadingOperatorInfo = false;
+      });
+    }
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -85,42 +199,163 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        // ---------------- Payment Settings ----------------
+
+        // ---------------- Operator Information ----------------
         _SectionCard(
-          title: 'Payment/Charges Settings',
-          icon: Icons.payments_outlined,
+          title: 'Operator Information',
+          icon: Icons.person_outline_rounded,
           children: [
-            Form(
-              key: _paymentFormKey,
-              child: Column(
+            if (_loadingOperatorInfo)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              Column(
                 children: [
-                  _LabeledField(
-                    label: 'Payment Gateway API Key',
-                    controller: _apiKeyController,
-                    hint: '500',
-                    icon: Icons.payments_outlined,
-                    obscure: true,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'API key is required' : null,
+                  _OperatorInfoRow(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Name',
+                    value: _operatorName,
                   ),
+
                   const SizedBox(height: 16),
-                  _LabeledField(
-                    label: 'New Parking Charges',
-                    controller: _merchantIdController,
-                    hint: 'e.g 850',
-                    icon: Icons.payments_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Merchant ID is required' : null,
+
+                  _OperatorInfoRow(
+                    icon: Icons.email_outlined,
+                    label: 'Email',
+                    value: _operatorEmail,
                   ),
-                  const SizedBox(height: 18),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _SaveButton(label: 'Save Changes', onPressed: _savePaymentSettings),
+
+                  const SizedBox(height: 16),
+
+                  _OperatorInfoRow(
+                    icon: Icons.location_on_outlined,
+                    label: 'Location',
+                    value: _operatorLocation,
                   ),
                 ],
               ),
-            ),
           ],
         ),
+
         const SizedBox(height: 20),
+
+// ---------------- Parking Charges ----------------
+    _SectionCard(
+    title: 'Parking Charges',
+      icon: Icons.local_parking_outlined,
+      children: [
+        FutureBuilder<int?>(
+          future: _getParkingCharges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Text(
+                'Unable to load parking charges.',
+                style: TextStyle(
+                  color: colorScheme.error,
+                ),
+              );
+            }
+
+            final charges = snapshot.data;
+
+            if (charges == null) {
+              return Text(
+                'Parking charges are not available.',
+                style: TextStyle(
+                  color: colorScheme.onSurface.withOpacity(0.6),
+                ),
+              );
+            }
+
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: colorScheme.primary.withOpacity(0.12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.local_parking_rounded,
+                      color: colorScheme.primary,
+                      size: 24,
+                    ),
+                  ),
+
+                  const SizedBox(width: 16),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Current Parking Charge',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.onSurface
+                                .withOpacity(0.6),
+                          ),
+                        ),
+
+                        const SizedBox(height: 5),
+
+                        Text(
+                          'Rs. $charges',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+
+                        const SizedBox(height: 2),
+
+                        Text(
+                          'Per hour',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurface
+                                .withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    ),
+
+
+
+    const SizedBox(height: 20),
 
         // ---------------- Appearance ----------------
         _SectionCard(
@@ -483,6 +718,75 @@ class _LanguageRow extends StatelessWidget {
           underline: const SizedBox.shrink(),
           items: _languages.map((lang) => DropdownMenuItem(value: lang, child: Text(lang))).toList(),
           onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
+
+
+
+
+
+class _OperatorInfoRow extends StatelessWidget {
+  const _OperatorInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: colorScheme.primary,
+            size: 20,
+          ),
+        ),
+
+        const SizedBox(width: 14),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: colorScheme.onSurface.withOpacity(0.55),
+                ),
+              ),
+
+              const SizedBox(height: 3),
+
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -3,11 +3,13 @@ class LocationModel {
     required this.id,
     required this.locationName,
     required this.address,
+    required this.parkingCharges,
   });
 
   final String id;
   final String locationName;
   final String address;
+  final int parkingCharges;
 
   factory LocationModel.fromFirestore(
       String id,
@@ -17,6 +19,7 @@ class LocationModel {
       id: id,
       locationName: data['locationName'] as String? ?? '',
       address: data['address'] as String? ?? '',
+      parkingCharges: data['parkingCharges'] as int? ?? 0,
     );
   }
 

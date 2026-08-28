@@ -11,10 +11,12 @@ class LocationService {
   Future<void> addLocation({
     required String locationName,
     required String address,
+    required int parkingCharges,
   }) async {
     await _firestore.collection('locations').add({
       'locationName': locationName,
       'address': address,
+      'parkingCharges': parkingCharges,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

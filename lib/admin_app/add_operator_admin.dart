@@ -58,7 +58,7 @@ class _AddOperatorState extends State<AddOperator> {
         name,
         email,
         password,
-        location.locationName,
+        location.id,
       );
 
       if (!mounted) return;

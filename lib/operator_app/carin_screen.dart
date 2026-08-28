@@ -1,5 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+import '../services/parking_charges_service.dart';
 enum VehicleCategory { bike, selfParking, valetParking }
 
 class CarinScreen extends StatefulWidget {
@@ -112,10 +116,40 @@ class _CarinScreenState extends State<CarinScreen> {
 // Header: title on the left, close (X) button on the right,
 // plus a row of ticket/time/operator meta info underneath.
 // ============================================================
-class _DialogHeader extends StatelessWidget {
+class _DialogHeader extends StatefulWidget {
   final VoidCallback onClose;
 
   const _DialogHeader({required this.onClose});
+
+  @override
+  State<_DialogHeader> createState() => _DialogHeaderState();
+}
+
+class _DialogHeaderState extends State<_DialogHeader> {
+  int? _parkingCharges;
+  bool _isLoadingCharges = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // First show cached value immediately.
+    _parkingCharges = ParkingChargeService.cachedCharge;
+
+    // Then load/refresh from Firestore.
+    _loadParkingCharges();
+  }
+
+  Future<void> _loadParkingCharges() async {
+    final charges = await ParkingChargeService.loadCharge();
+
+    if (!mounted) return;
+
+    setState(() {
+      _parkingCharges = charges;
+      _isLoadingCharges = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,18 +177,23 @@ class _DialogHeader extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
+
                 const SizedBox(height: 8),
-                // TODO: Replace these placeholder values with the
-                // real ticket number, timestamp, and logged-in
+
                 _HeaderMetaRow(
                   ticketNumber: 'TKT-9001',
-                  dateTime: DateFormat('h:mm a, MMM dd, yyyy').format(DateTime.now()),
+                  dateTime: DateFormat(
+                    'h:mm a, MMM dd, yyyy',
+                  ).format(DateTime.now()),
+                  charges: _parkingCharges,
+                  isLoadingCharges: _isLoadingCharges,
                 ),
               ],
             ),
           ),
+
           IconButton(
-            onPressed: onClose,
+            onPressed: widget.onClose,
             icon: const Icon(Icons.close),
             color: const Color(0xFF616161),
           ),
@@ -164,39 +203,107 @@ class _DialogHeader extends StatelessWidget {
   }
 }
 
+
 class _HeaderMetaRow extends StatelessWidget {
   final String ticketNumber;
   final String dateTime;
+  final int? charges;
+  final bool isLoadingCharges;
 
   const _HeaderMetaRow({
     required this.ticketNumber,
     required this.dateTime,
+    required this.charges,
+    required this.isLoadingCharges,
   });
 
   @override
   Widget build(BuildContext context) {
-    const textStyle = TextStyle(fontSize: 13, color: Color(0xFF616161));
-    const dotSpacing = SizedBox(width: 10);
+    const textStyle = TextStyle(
+      fontSize: 13,
+      color: Color(0xFF616161),
+    );
 
-    // Wrap lets these bits of meta info flow onto a new line
-    // instead of overflowing on narrow windows.
+    const spacing = SizedBox(width: 10);
+
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(Icons.confirmation_number_outlined,
-            size: 15, color: Color(0xFF616161)),
+        const Icon(
+          Icons.confirmation_number_outlined,
+          size: 15,
+          color: Color(0xFF616161),
+        ),
+
         const SizedBox(width: 4),
-        Text('Ticket #$ticketNumber', style: textStyle),
-        dotSpacing,
-        const Text('•', style: textStyle),
-        dotSpacing,
-        const Icon(Icons.access_time, size: 15, color: Color(0xFF616161)),
+
+        Text(
+          'Ticket #$ticketNumber',
+          style: textStyle,
+        ),
+
+        spacing,
+
+        const Text(
+          '•',
+          style: textStyle,
+        ),
+
+        spacing,
+
+        const Icon(
+          Icons.access_time,
+          size: 15,
+          color: Color(0xFF616161),
+        ),
+
         const SizedBox(width: 4),
-        Text(dateTime, style: textStyle),
+
+        Text(
+          dateTime,
+          style: textStyle,
+        ),
+
+        spacing,
+
+        const Text(
+          '•',
+          style: textStyle,
+        ),
+
+        spacing,
+
+        const Icon(
+          Icons.local_parking_outlined,
+          size: 15,
+          color: Color(0xFF616161),
+        ),
+
+        const SizedBox(width: 4),
+
+        if (charges != null)
+          Text(
+            'Rs. $charges/hr',
+            style: textStyle,
+          )
+        else if (isLoadingCharges)
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+            ),
+          )
+        else
+          const Text(
+            'Charge unavailable',
+            style: textStyle,
+          ),
       ],
     );
   }
 }
+
 
 // ============================================================
 // The 3 selectable vehicle category cards: Bike, Self Parking,

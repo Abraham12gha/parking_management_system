@@ -72,7 +72,7 @@ class Auth {
       String name,
       String email,
       String password,
-      String location,
+      String locationId,
       ) async {
     FirebaseApp? secondaryApp;
 
@@ -110,7 +110,7 @@ class Auth {
           .set({
         'firstName': name,
         'email': email,
-        'location': location,
+        'location': locationId,
         'role': 'operator',
         'createdAt': FieldValue.serverTimestamp(),
       });

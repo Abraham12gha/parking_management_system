@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/cloudinary_service.dart';
@@ -13,6 +15,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+
+  // Operator Information
+  String _operatorName = 'Loading...';
+  String _operatorEmail = 'Loading...';
+  String _operatorLocation = 'Loading...';
+  bool _loadingOperatorInfo = true;
   // Branding
   final _appNameController = TextEditingController(text: 'My Admin App');
 
@@ -160,10 +168,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
 
+
+
+
+
+
+
+
+
+
+
+  Future<void> _loadOperatorInfo() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _operatorName = 'Not available';
+          _operatorEmail = 'Not available';
+          _operatorLocation = 'Not available';
+          _loadingOperatorInfo = false;
+        });
+
+        return;
+      }
+
+      final userDocument = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDocument.data();
+
+      if (!mounted) return;
+
+      setState(() {
+        _operatorName =
+            userData?['name']?.toString() ??
+                user.displayName ??
+                'Not available';
+
+        _operatorEmail =
+            user.email ?? 'Not available';
+
+        _operatorLocation =
+            userData?['location']?.toString() ??
+                'Not available';
+
+        _loadingOperatorInfo = false;
+      });
+    } catch (e) {
+      debugPrint('LOAD OPERATOR INFO ERROR: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _operatorName = 'Not available';
+        _operatorEmail = 'Not available';
+        _operatorLocation = 'Not available';
+        _loadingOperatorInfo = false;
+      });
+    }
+  }
+
+
+
+
   @override
   void initState() {
     super.initState();
     _loadCompanySettings();
+    _loadOperatorInfo();
   }
 
   @override
@@ -173,7 +250,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        // ---------------- App Branding ----------------
+
+
+
+
+// ---------------- Operator Information ----------------
+    _SectionCard(
+    title: 'Operator Information',
+      icon: Icons.person_outline_rounded,
+      children: [
+        if (_loadingOperatorInfo)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else
+          Column(
+            children: [
+              _OperatorInfoRow(
+                icon: Icons.person_outline_rounded,
+                label: 'Name',
+                value: _operatorName,
+              ),
+
+              const SizedBox(height: 16),
+
+              _OperatorInfoRow(
+                icon: Icons.email_outlined,
+                label: 'Email',
+                value: _operatorEmail,
+              ),
+
+              const SizedBox(height: 16),
+
+              _OperatorInfoRow(
+                icon: Icons.location_on_outlined,
+                label: 'Location',
+                value: _operatorLocation,
+              ),
+            ],
+          ),
+      ],
+    ),
+
+    const SizedBox(height: 20),
+
+
+
+
+
+    // ---------------- App Branding ----------------
         _SectionCard(
           title: 'App Branding',
           icon: Icons.storefront_outlined,
@@ -627,6 +755,74 @@ class _LanguageRow extends StatelessWidget {
           underline: const SizedBox.shrink(),
           items: _languages.map((lang) => DropdownMenuItem(value: lang, child: Text(lang))).toList(),
           onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}
+
+
+
+
+class _OperatorInfoRow extends StatelessWidget {
+  const _OperatorInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: colorScheme.primary,
+            size: 20,
+          ),
+        ),
+
+        const SizedBox(width: 14),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: colorScheme.onSurface.withOpacity(0.55),
+                ),
+              ),
+
+              const SizedBox(height: 3),
+
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

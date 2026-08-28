@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// A polished top bar for the admin panel.
-///
-/// Pass [onMenuTap] to show a hamburger icon (used on mobile to open the
-/// sidebar drawer). Leave it null on wide/desktop layouts where the
-/// sidebar is already permanently visible.
 class OperatorAppbar extends StatelessWidget implements PreferredSizeWidget {
   const OperatorAppbar({
     super.key,
