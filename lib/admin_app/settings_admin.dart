@@ -167,17 +167,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
   Future<void> _loadOperatorInfo() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -250,58 +239,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-
-
-
-
-// ---------------- Operator Information ----------------
-    _SectionCard(
-    title: 'Operator Information',
-      icon: Icons.person_outline_rounded,
-      children: [
-        if (_loadingOperatorInfo)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
-          )
-        else
-          Column(
-            children: [
-              _OperatorInfoRow(
-                icon: Icons.person_outline_rounded,
-                label: 'Name',
-                value: _operatorName,
-              ),
-
-              const SizedBox(height: 16),
-
-              _OperatorInfoRow(
-                icon: Icons.email_outlined,
-                label: 'Email',
-                value: _operatorEmail,
-              ),
-
-              const SizedBox(height: 16),
-
-              _OperatorInfoRow(
-                icon: Icons.location_on_outlined,
-                label: 'Location',
-                value: _operatorLocation,
-              ),
-            ],
-          ),
-      ],
-    ),
-
-    const SizedBox(height: 20),
-
-
-
-
-
-    // ---------------- App Branding ----------------
+    //--------------- App Branding ----------------
         _SectionCard(
           title: 'App Branding',
           icon: Icons.storefront_outlined,
@@ -357,41 +295,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 20),
 
-        // ---------------- Payment Settings ----------------
+        // ---------------- Operator Information ----------------
         _SectionCard(
-          title: 'Payment/Charges Settings',
-          icon: Icons.payments_outlined,
+          title: 'Personal Information',
+          icon: Icons.person_outline_rounded,
           children: [
-            Form(
-              key: _paymentFormKey,
-              child: Column(
+            if (_loadingOperatorInfo)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              Column(
                 children: [
-                  _LabeledField(
-                    label: 'Payment Gateway API Key',
-                    controller: _apiKeyController,
-                    hint: '500',
-                    icon: Icons.payments_outlined,
-                    obscure: true,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'API key is required' : null,
+                  _OperatorInfoRow(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Name',
+                    value: _operatorName,
                   ),
+
                   const SizedBox(height: 16),
-                  _LabeledField(
-                    label: 'New Parking Charges',
-                    controller: _merchantIdController,
-                    hint: 'e.g 850',
-                    icon: Icons.payments_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Merchant ID is required' : null,
+
+                  _OperatorInfoRow(
+                    icon: Icons.email_outlined,
+                    label: 'Email',
+                    value: _operatorEmail,
                   ),
-                  const SizedBox(height: 18),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _SaveButton(label: 'Save Changes', onPressed: _savePaymentSettings),
+
+                  const SizedBox(height: 16),
+
+                  _OperatorInfoRow(
+                    icon: Icons.location_on_outlined,
+                    label: 'Location',
+                    value: _operatorLocation,
                   ),
                 ],
               ),
-            ),
           ],
         ),
+
         const SizedBox(height: 20),
 
         // ---------------- Appearance ----------------
