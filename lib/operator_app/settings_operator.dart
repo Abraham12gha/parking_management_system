@@ -15,6 +15,7 @@ class SettingScreenOperator extends StatefulWidget {
 }
 
 class _SettingScreenOperatorState extends State<SettingScreenOperator> {
+
   // ============================================================
   // Operator Information
   // ============================================================
@@ -24,6 +25,8 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
   String _operatorLocation = '';
 
   int? _parkingCharges;
+  int? _graceTimeSeconds;
+
 
   bool _loadingOperatorInfo = true;
   bool _loadingParkingCharges = true;
@@ -32,6 +35,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
   static const String _operatorEmailKey = 'operator_email';
   static const String _operatorLocationKey = 'operator_location';
   static const String _parkingChargesKey = 'parking_charges';
+  static const String _graceTimeKey = 'grace_time_seconds';
 
   // ============================================================
   // Branding
@@ -96,14 +100,43 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
     await _loadOperatorInfo();
   }
 
+  String _formatGraceTime(int? seconds) {
+    if (seconds == null || seconds <= 0) {
+      return 'No free time';
+    }
+
+    final duration = Duration(seconds: seconds);
+
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+
+    if (hours > 0 && minutes > 0) {
+      return '$hours ${hours == 1 ? 'hour' : 'hours'} '
+          '$minutes ${minutes == 1 ? 'minute' : 'minutes'}';
+    }
+
+    if (hours > 0) {
+      return '$hours ${hours == 1 ? 'hour' : 'hours'}';
+    }
+
+    return '$minutes ${minutes == 1 ? 'minute' : 'minutes'}';
+  }
+
   Future<void> _loadCachedParkingCharges() async {
     final prefs = await SharedPreferences.getInstance();
 
     final cachedCharges =
     prefs.getInt(_parkingChargesKey);
 
+    final cachedGraceTime =
+    prefs.getInt(_graceTimeKey);
+
     debugPrint(
       'Cached parking charges: $cachedCharges',
+    );
+
+    debugPrint(
+      'Cached grace time: $cachedGraceTime',
     );
 
     if (!mounted) return;
@@ -111,6 +144,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
     if (cachedCharges != null) {
       setState(() {
         _parkingCharges = cachedCharges;
+        _graceTimeSeconds = cachedGraceTime ?? 0;
         _loadingParkingCharges = false;
       });
     }
@@ -125,7 +159,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
       if (user == null) {
         debugPrint(
-          'PARKING CHARGES: No authenticated user.',
+          'PARKING SETTINGS: No authenticated user.',
         );
 
         if (!mounted) return;
@@ -148,7 +182,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
       if (!userDocument.exists) {
         debugPrint(
-          'PARKING CHARGES: User document not found.',
+          'PARKING SETTINGS: User document not found.',
         );
 
         if (!mounted) return;
@@ -171,7 +205,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
       if (locationId == null || locationId.isEmpty) {
         debugPrint(
-          'PARKING CHARGES: Location ID missing.',
+          'PARKING SETTINGS: Location ID missing.',
         );
 
         if (!mounted) return;
@@ -184,22 +218,21 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       }
 
       debugPrint(
-        'PARKING CHARGES: Location ID = $locationId',
+        'PARKING SETTINGS: Location ID = $locationId',
       );
 
       // ----------------------------------------------------------
       // Get location
       // ----------------------------------------------------------
 
-      final locationDocument =
-      await FirebaseFirestore.instance
+      final locationDocument = await FirebaseFirestore.instance
           .collection('locations')
           .doc(locationId)
           .get();
 
       if (!locationDocument.exists) {
         debugPrint(
-          'PARKING CHARGES: Location not found.',
+          'PARKING SETTINGS: Location not found.',
         );
 
         if (!mounted) return;
@@ -211,15 +244,18 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
         return;
       }
 
-      final locationData =
-      locationDocument.data();
+      final locationData = locationDocument.data();
 
-      final charges =
-      locationData?['parkingCharges'];
+      // ----------------------------------------------------------
+      // Get parking settings
+      // ----------------------------------------------------------
+
+      final charges = locationData?['parkingCharges'];
+      final graceTime = locationData?['graceTimeSeconds'];
 
       if (charges == null) {
         debugPrint(
-          'PARKING CHARGES: parkingCharges missing.',
+          'PARKING SETTINGS: parkingCharges missing.',
         );
 
         if (!mounted) return;
@@ -234,8 +270,17 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       final int latestCharges =
       (charges as num).toInt();
 
+      final int latestGraceTime =
+      graceTime != null
+          ? (graceTime as num).toInt()
+          : 0;
+
       debugPrint(
         'Latest parking charges: $latestCharges',
+      );
+
+      debugPrint(
+        'Latest grace time: $latestGraceTime seconds',
       );
 
       // ----------------------------------------------------------
@@ -250,8 +295,13 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
         latestCharges,
       );
 
+      await prefs.setInt(
+        _graceTimeKey,
+        latestGraceTime,
+      );
+
       debugPrint(
-        'Parking charges saved to cache.',
+        'Parking settings saved to cache.',
       );
 
       // ----------------------------------------------------------
@@ -262,20 +312,23 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
       setState(() {
         _parkingCharges = latestCharges;
+        _graceTimeSeconds = latestGraceTime;
         _loadingParkingCharges = false;
       });
 
+      debugPrint(
+        'Parking settings loaded successfully.',
+      );
     } catch (e, stackTrace) {
       debugPrint(
-        'PARKING CHARGES ERROR: $e',
+        'PARKING SETTINGS ERROR: $e',
       );
 
       debugPrint(
         'STACK TRACE: $stackTrace',
       );
 
-      // IMPORTANT:
-      // If Firestore fails, KEEP the cached value.
+      // Keep cached values if Firestore fails.
       if (!mounted) return;
 
       setState(() {
@@ -620,8 +673,11 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
         // ========================================================
         // Parking Charges
         // ========================================================
+        // ========================================================
+// Parking Settings
+// ========================================================
         _SectionCard(
-          title: 'Parking Charges',
+          title: 'Parking Settings',
           icon: Icons.local_parking_outlined,
           children: [
             if (_loadingParkingCharges &&
@@ -632,78 +688,119 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
                   child: CircularProgressIndicator(),
                 ),
               )
-            else if (_parkingCharges == null)
-              Text(
-                'Parking charges are not available.',
-                style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withOpacity(0.6),
-                ),
-              )
             else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withOpacity(0.06),
-                  borderRadius:
-                  BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.local_parking_rounded,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
-                      size: 28,
-                    ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool compact = constraints.maxWidth < 600;
 
-                    const SizedBox(width: 16),
-
-                    Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  if (compact) {
+                    return Column(
                       children: [
-                        Text(
-                          'Current Parking Charge',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.6),
-                          ),
+                        _ParkingSettingCard(
+                          icon: Icons.payments_outlined,
+                          title: 'Parking Charge',
+                          value: _parkingCharges == null
+                              ? 'Not available'
+                              : 'Rs. $_parkingCharges',
+                          unit: 'per hour',
+                          description:
+                          'Amount charged for each parking hour.',
                         ),
 
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 12),
 
-                        Text(
-                          'Rs. $_parkingCharges',
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
+                        _ParkingSettingCard(
+                          icon: Icons.timer_outlined,
+                          title: 'Grace Time',
+                          value: _formatGraceTime(
+                            _graceTimeSeconds,
                           ),
-                        ),
-
-                        const SizedBox(height: 2),
-
-                        const Text(
-                          'Per hour',
-                          style: TextStyle(
-                            fontSize: 12,
-                          ),
+                          unit: 'free parking',
+                          description:
+                          'Free time before parking charges begin.',
                         ),
                       ],
-                    ),
-                  ],
-                ),
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _ParkingSettingCard(
+                          icon: Icons.payments_outlined,
+                          title: 'Parking Charge',
+                          value: _parkingCharges == null
+                              ? 'Not available'
+                              : 'Rs. $_parkingCharges',
+                          unit: 'per hour',
+                          description:
+                          'Amount charged for each parking hour.',
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      Expanded(
+                        child: _ParkingSettingCard(
+                          icon: Icons.timer_outlined,
+                          title: 'Grace Time',
+                          value: _formatGraceTime(
+                            _graceTimeSeconds,
+                          ),
+                          unit: 'free parking',
+                          description:
+                          'Free time before parking charges begin.',
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
+
+            const SizedBox(height: 14),
+
+            // Simple explanation for operators
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.035),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 19,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.55),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Text(
+                      'Customers can park for the grace time for free. '
+                          'Parking charges apply after the free period ends.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
 
@@ -1300,6 +1397,126 @@ class _OperatorInfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class _ParkingSettingCard extends StatelessWidget {
+  const _ParkingSettingCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.unit,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String unit;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.onSurface.withOpacity(0.08),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Icon
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.09),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: colorScheme.primary,
+              size: 23,
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+
+                const SizedBox(height: 5),
+
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  unit,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.primary,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    color: colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
