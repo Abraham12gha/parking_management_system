@@ -7,19 +7,14 @@ import '../firebase_options.dart';
 class Auth {
   final FirebaseAuth _authService = FirebaseAuth.instance;
 
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // =========================
+  // ============================================================
   // LOGIN
-  // =========================
+  // ============================================================
 
-  Future<User?> login(
-      String email,
-      String password,
-      ) async {
-    final userCredential =
-    await _authService.signInWithEmailAndPassword(
+  Future<User?> login(String email, String password) async {
+    final userCredential = await _authService.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
@@ -27,31 +22,34 @@ class Auth {
     return userCredential.user;
   }
 
-  // =========================
+  // ============================================================
   // LOGOUT
-  // =========================
+  // ============================================================
 
   Future<void> logout() async {
     await _authService.signOut();
   }
 
-  // =========================
-  // GET CURRENT USER
-  // =========================
+  // Future<void> logoutOnAppStart() async {
+  //   if (_authService.currentUser != null) {
+  //     await _authService.signOut();
+  //   }
+  // }
+
+  // ============================================================
+  // CURRENT USER
+  // ============================================================
 
   User? get currentUser {
     return _authService.currentUser;
   }
 
-  // =========================
+  // ============================================================
   // GET USER ROLE
-  // =========================
+  // ============================================================
 
   Future<String?> getUserRole(String uid) async {
-    final document = await _firestore
-        .collection('users')
-        .doc(uid)
-        .get();
+    final document = await _firestore.collection('users').doc(uid).get();
 
     if (!document.exists) {
       return null;
@@ -62,35 +60,27 @@ class Auth {
     return data?['role'] as String?;
   }
 
-
-
-  //-------------
-  // ADD OPERATOR
-  //-------------
+  // ============================================================
+  // CREATE OPERATOR
+  // ============================================================
 
   Future<User?> addOperator(
-      String name,
-      String email,
-      String password,
-      String locationId,
-      ) async {
+    String name,
+    String email,
+    String password,
+    String locationId,
+  ) async {
     FirebaseApp? secondaryApp;
 
     try {
-      // Create a second Firebase app.
       secondaryApp = await Firebase.initializeApp(
         name: 'operatorCreation',
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
-      // Use Firebase Auth from the SECOND app.
-      final secondaryAuth = FirebaseAuth.instanceFor(
-        app: secondaryApp,
-      );
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
 
-      // Create the operator.
-      final operatorCred =
-      await secondaryAuth.createUserWithEmailAndPassword(
+      final operatorCred = await secondaryAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -101,24 +91,17 @@ class Auth {
         throw Exception('Operator account could not be created.');
       }
 
-      // IMPORTANT:
-      // Use the MAIN Firestore instance.
-      // The admin remains logged into the main Firebase app.
-      await _firestore
-          .collection('users')
-          .doc(operator.uid)
-          .set({
+      await _firestore.collection('users').doc(operator.uid).set({
         'firstName': name,
         'email': email,
         'location': locationId,
         'role': 'operator',
+        'disabled': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Sign out from the SECONDARY Firebase Auth.
       await secondaryAuth.signOut();
 
-      // Delete the secondary Firebase app.
       await secondaryApp.delete();
       secondaryApp = null;
 
@@ -142,4 +125,37 @@ class Auth {
     }
   }
 
+  // ============================================================
+  // CHANGE CURRENT USER PASSWORD
+  // ============================================================
+
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _authService.currentUser;
+
+    if (user == null) {
+      throw Exception('No user is currently signed in.');
+    }
+
+    if (user.email == null || user.email!.isEmpty) {
+      throw Exception('The current account does not have an email address.');
+    }
+
+    if (newPassword.length < 6) {
+      throw Exception('Password must be at least 6 characters.');
+    }
+
+    // Re-authenticate first.
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: currentPassword,
+    );
+
+    await user.reauthenticateWithCredential(credential);
+
+    // Then change the password.
+    await user.updatePassword(newPassword);
+  }
 }

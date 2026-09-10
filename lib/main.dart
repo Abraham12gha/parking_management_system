@@ -4,6 +4,7 @@ import 'package:parking_management_system/auth_wrapper.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
 import 'package:parking_management_system/resources/widget/internet_connection_banner.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:parking_management_system/services/auth.dart';
 import 'package:parking_management_system/theme_controller.dart';
 import 'app_settings.dart';
 import 'firebase_options.dart';
@@ -14,6 +15,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // final auth = Auth();
+  // await auth.logoutOnAppStart();
   runApp(
       const MyApp()
   );

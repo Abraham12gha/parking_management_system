@@ -7,6 +7,7 @@ import 'add_location.dart';
 import 'admin_appbar.dart';
 import 'admin_sideBar.dart';
 import 'dashboard_screen.dart';
+import 'operator_list.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -21,6 +22,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
 
   int _selectedIndex = 0;
+  bool _showAddOperator = false;
 
   static const double _desktopBreakpoint = 1000;
 
@@ -34,18 +36,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
     'Settings',
   ];
 
-  final List<Widget> _pages = [
-    DashboardScreen(),
-    AddOperator(),
-    AddLocationAdmin(),
-    DashboardScreen(),
-    DashboardScreen(),
-    DashboardScreen(),
-    SettingsScreen()
+  List<Widget> get _pages => [
+    const DashboardScreen(),
+
+    OperatorList(
+      onAddOperator: () {
+        setState(() {
+          _showAddOperator = true;
+        });
+      },
+    ),
+
+    const AddLocationAdmin(),
+    const DashboardScreen(),
+    const DashboardScreen(),
+    const DashboardScreen(),
+    const SettingsScreen(),
   ];
 
   void _onItemSelected(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _showAddOperator = false;
+    });
+
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       Navigator.of(context).pop();
     }
@@ -134,16 +148,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 child: Column(
                   children: [
                     AdminAppBar(
-                      title: _titles[_selectedIndex],
-                      onMenuTap: isDesktop ? null : () => _scaffoldKey.currentState?.openDrawer(),
+                      title: _showAddOperator
+                          ? 'Add Operator'
+                          : _titles[_selectedIndex],
+                      onMenuTap: isDesktop
+                          ? null
+                          : () => _scaffoldKey.currentState?.openDrawer(),
                     ),
                     Expanded(
-                      child: Container(
-                        color: Theme.of(context).colorScheme.surface,
-                        child: IndexedStack(
-                          index: _selectedIndex,
-                          children: _pages,
-                        ),
+                      child: _showAddOperator
+                          ? AddOperator(
+                        onBack: () {
+                          setState(() {
+                            _showAddOperator = false;
+                          });
+                        },
+                      )
+                          : IndexedStack(
+                        index: _selectedIndex,
+                        children: _pages,
                       ),
                     ),
                   ],

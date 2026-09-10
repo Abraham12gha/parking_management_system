@@ -4,14 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../services/parking_charges_service.dart';
+import '../services/parking_ticket_service.dart';
+
 enum VehicleCategory { bike, selfParking, valetParking }
 
 class CarinScreen extends StatefulWidget {
   final VoidCallback onBack;
-  const CarinScreen({
-    super.key,
-    required this.onBack,
-  });
+  const CarinScreen({super.key, required this.onBack});
 
   @override
   State<CarinScreen> createState() => _CarinScreenState();
@@ -20,11 +19,15 @@ class CarinScreen extends StatefulWidget {
 class _CarinScreenState extends State<CarinScreen> {
   VehicleCategory _selectedCategory = VehicleCategory.valetParking;
 
+  final ParkingTicketService _parkingTicketService = ParkingTicketService();
+
   // Controllers for the form fields.
   final _vehicleNumberController = TextEditingController();
   final _driverNameController = TextEditingController();
   final _phoneNumberController = TextEditingController();
-  final _notesController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController(
+    text: 'clear',
+  );
 
   @override
   void dispose() {
@@ -35,80 +38,145 @@ class _CarinScreenState extends State<CarinScreen> {
     super.dispose();
   }
 
+  bool _isSaving = false;
+  Future<void> _generateTicket() async {
+    // Vehicle number is mandatory.
+    final vehicleNumber = _vehicleNumberController.text.trim();
+
+    if (vehicleNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the vehicle number.')),
+      );
+      return;
+    }
+
+    String vehicleCategory;
+
+    switch (_selectedCategory) {
+      case VehicleCategory.bike:
+        vehicleCategory = 'bike';
+        break;
+
+      case VehicleCategory.selfParking:
+        vehicleCategory = 'self';
+        break;
+
+      case VehicleCategory.valetParking:
+        vehicleCategory = 'valet';
+        break;
+    }
+
+    try {
+      // Prevent duplicate taps while saving.
+      setState(() {
+        _isSaving = true;
+      });
+
+      final ticketId = await _parkingTicketService.createVehicleEntry(
+        vehicleCategory: vehicleCategory,
+        vehicleNumber: vehicleNumber,
+        driverName: _driverNameController.text,
+        phoneNumber: _phoneNumberController.text,
+        notes: _notesController.text,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Vehicle entry saved successfully. Ticket ID: $ticketId',
+          ),
+        ),
+      );
+
+      widget.onBack();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save vehicle entry: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-        color: Theme.of(context).colorScheme.surface,
-        child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8F7),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _DialogHeader(
-                onClose: widget.onBack,
+      color: Theme.of(context).colorScheme.surface,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8F7),
+                borderRadius: BorderRadius.circular(16),
               ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Vehicle Category',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _DialogHeader(onClose: widget.onBack),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Vehicle Category',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _CategorySelector(
+                            selected: _selectedCategory,
+                            onSelected: (category) {
+                              setState(() => _selectedCategory = category);
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Vehicle Details',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _VehicleDetailsForm(
+                            vehicleNumberController: _vehicleNumberController,
+                            driverNameController: _driverNameController,
+                            phoneNumberController: _phoneNumberController,
+                            notesController: _notesController,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      _CategorySelector(
-                        selected: _selectedCategory,
-                        onSelected: (category) {
-                          setState(() => _selectedCategory = category);
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Vehicle Details',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _VehicleDetailsForm(
-                        vehicleNumberController: _vehicleNumberController,
-                        driverNameController: _driverNameController,
-                        phoneNumberController: _phoneNumberController,
-                        notesController: _notesController,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  _DialogFooter(
+                    onCancel: widget.onBack,
+                    onGenerateTicket: _generateTicket,
+                    isSaving: _isSaving,
+                  ),
+                ],
               ),
-              _DialogFooter(
-                onCancel: widget.onBack,
-                onGenerateTicket: () {
-                  // TODO: Validate fields, create the vehicle entry
-                  // record, and save it (e.g. to Firestore).
-                },
-              ),
-            ],
+            ),
           ),
         ),
       ),
-            ),
-    ));
+    );
   }
 }
 
@@ -203,7 +271,6 @@ class _DialogHeaderState extends State<_DialogHeader> {
   }
 }
 
-
 class _HeaderMetaRow extends StatelessWidget {
   final String ticketNumber;
   final String dateTime;
@@ -219,10 +286,7 @@ class _HeaderMetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textStyle = TextStyle(
-      fontSize: 13,
-      color: Color(0xFF616161),
-    );
+    const textStyle = TextStyle(fontSize: 13, color: Color(0xFF616161));
 
     const spacing = SizedBox(width: 10);
 
@@ -237,39 +301,23 @@ class _HeaderMetaRow extends StatelessWidget {
 
         const SizedBox(width: 4),
 
-        Text(
-          'Ticket #$ticketNumber',
-          style: textStyle,
-        ),
+        Text('Ticket #$ticketNumber', style: textStyle),
 
         spacing,
 
-        const Text(
-          '•',
-          style: textStyle,
-        ),
+        const Text('•', style: textStyle),
 
         spacing,
 
-        const Icon(
-          Icons.access_time,
-          size: 15,
-          color: Color(0xFF616161),
-        ),
+        const Icon(Icons.access_time, size: 15, color: Color(0xFF616161)),
 
         const SizedBox(width: 4),
 
-        Text(
-          dateTime,
-          style: textStyle,
-        ),
+        Text(dateTime, style: textStyle),
 
         spacing,
 
-        const Text(
-          '•',
-          style: textStyle,
-        ),
+        const Text('•', style: textStyle),
 
         spacing,
 
@@ -282,28 +330,19 @@ class _HeaderMetaRow extends StatelessWidget {
         const SizedBox(width: 4),
 
         if (charges != null)
-          Text(
-            'Rs. $charges/hr',
-            style: textStyle,
-          )
+          Text('Rs. $charges/hr', style: textStyle)
         else if (isLoadingCharges)
           const SizedBox(
             width: 12,
             height: 12,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 1.5),
           )
         else
-          const Text(
-            'Charge unavailable',
-            style: textStyle,
-          ),
+          const Text('Charge unavailable', style: textStyle),
       ],
     );
   }
 }
-
 
 // ============================================================
 // The 3 selectable vehicle category cards: Bike, Self Parking,
@@ -313,10 +352,7 @@ class _CategorySelector extends StatelessWidget {
   final VehicleCategory selected;
   final ValueChanged<VehicleCategory> onSelected;
 
-  const _CategorySelector({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _CategorySelector({required this.selected, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +416,9 @@ class _CategoryCard extends StatelessWidget {
           color: isSelected ? const Color(0xFFA8E6A3) : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? theme.colorScheme.primary : const Color(0xFFE0E0E0),
+            color: isSelected
+                ? theme.colorScheme.primary
+                : const Color(0xFFE0E0E0),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -541,14 +579,16 @@ class _FormField extends StatelessWidget {
             hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
             prefixIcon: maxLines > 1
                 ? Padding(
-              padding: const EdgeInsets.only(bottom: 40),
-              child: Icon(icon, size: 18, color: const Color(0xFF9E9E9E)),
-            )
+                    padding: const EdgeInsets.only(bottom: 40),
+                    child: Icon(icon, size: 18, color: const Color(0xFF9E9E9E)),
+                  )
                 : Icon(icon, size: 18, color: const Color(0xFF9E9E9E)),
             filled: true,
             fillColor: Colors.white,
-            contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
@@ -559,7 +599,9 @@ class _FormField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -571,10 +613,12 @@ class _FormField extends StatelessWidget {
 class _DialogFooter extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onGenerateTicket;
+  final bool isSaving;
 
   const _DialogFooter({
     required this.onCancel,
     required this.onGenerateTicket,
+    required this.isSaving,
   });
 
   @override
@@ -591,11 +635,10 @@ class _DialogFooter extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisAlignment: .end,
-        spacing: 12,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
           OutlinedButton(
-            onPressed: onCancel,
+            onPressed: isSaving ? null : onCancel,
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF424242),
               side: const BorderSide(color: Color(0xFFBDBDBD)),
@@ -606,8 +649,11 @@ class _DialogFooter extends StatelessWidget {
             ),
             child: const Text('Cancel'),
           ),
+
+          const SizedBox(width: 12),
+
           ElevatedButton.icon(
-            onPressed: onGenerateTicket,
+            onPressed: isSaving ? null : onGenerateTicket,
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.colorScheme.primary,
               foregroundColor: Colors.white,
@@ -617,8 +663,17 @@ class _DialogFooter extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            icon: const Icon(Icons.local_print_shop_outlined, size: 18),
-            label: const Text('Generate + Print'),
+            icon: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.local_print_shop_outlined, size: 18),
+            label: Text(isSaving ? 'Saving...' : 'Generate + Print'),
           ),
         ],
       ),
