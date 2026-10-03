@@ -60,6 +60,33 @@ class ParkingTicketService {
       throw Exception('Operator location is not configured.');
     }
 
+    // Vehicle number must strictly follow ABC-123 or ABC-1234
+    final cleanPlate = vehicleNumber.trim().toUpperCase();
+    final plateRegex = RegExp(r'^[A-Z]{3}-\d{3,4}$');
+    if (!plateRegex.hasMatch(cleanPlate)) {
+      throw Exception(
+        'Vehicle number must follow the format ABC-123 or ABC-1234 (e.g. ABC-123 or ABC-1234).',
+      );
+    }
+
+    final normalizedVehicleNumber = cleanPlate.replaceAll(RegExp(r'\s+'), '');
+    final activeTickets = await _firestore
+        .collection('parking_tickets')
+        .where('locationId', isEqualTo: locationId)
+        .where('status', isEqualTo: 'in')
+        .get();
+    final duplicate = activeTickets.docs.any((doc) {
+      final existing = (doc.data()['vehicleNumber'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase()
+          .replaceAll(RegExp(r'\s+'), '');
+      return existing == normalizedVehicleNumber;
+    });
+    if (duplicate) {
+      throw Exception('This vehicle is already inside this parking location.');
+    }
+
     // ------------------------------------------------------------
     // 2. Get location document
     // ------------------------------------------------------------
@@ -207,6 +234,10 @@ class ParkingTicketService {
 
       // Operator
       'operatorId': operatorId,
+      'entryOperatorId': operatorId,
+      'entryOperatorName': (userData['firstName'] ?? userData['name'] ?? '').toString(),
+      'exitOperatorId': '',
+      'exitOperatorName': '',
 
       // Parking timing
       'startTime': FieldValue.serverTimestamp(),

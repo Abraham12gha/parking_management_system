@@ -5,6 +5,7 @@ import 'package:parking_management_system/services/auth.dart';
 
 import '../admin_app/Admin_Dashboard.dart';
 import '../operator_app/operator_dashboard.dart' hide AdminDashboard;
+import '../services/app_data_cache.dart';
 import 'login_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -26,8 +27,9 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // User is NOT logged in
+        // User is NOT logged in — clear any stale cache data
         if (!snapshot.hasData) {
+          AppDataCache.instance.clear();
           return const LoginScreen();
         }
 
@@ -56,11 +58,12 @@ class RoleBasedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String?>(
+      initialData: _auth.getCachedRole(user.uid),
       future: _auth.getUserRole(user.uid),
 
       builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(),

@@ -32,7 +32,7 @@ class AdminSidebar extends StatelessWidget {
     SidebarItem(icon: Icons.location_pin, selectedIcon: Icons.location_pin, label: 'locations'),
     SidebarItem(icon: Icons.payments, selectedIcon: Icons.payments, label: 'Payment Methods'),
     SidebarItem(icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart_rounded, label: 'Analytics'),
-    SidebarItem(icon: Icons.question_answer_outlined, selectedIcon: Icons.question_answer_outlined, label: 'Request'),
+    SidebarItem(icon: Icons.assessment_outlined, selectedIcon: Icons.assessment_rounded, label: 'Reports'),
     SidebarItem(icon: Icons.settings_outlined, selectedIcon: Icons.settings_rounded, label: 'Settings'),
   ];
 

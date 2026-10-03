@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:parking_management_system/services/auth.dart';
 import 'package:parking_management_system/services/company_settings_service.dart';
 import 'admin_app/Admin_Dashboard.dart';
+import 'auth_wrapper.dart';
 import 'company-data/company_info.dart';
 import 'operator_app/operator_dashboard.dart';
 
@@ -387,6 +388,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 await _auth.login(
                                   _emailController.text.trim(),
                                   _passwordController.text,
+                                );
+
+                                if (!mounted) return;
+
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(
+                                    builder: (_) => const AuthWrapper(),
+                                  ),
+                                  (route) => false,
                                 );
 
                               } on FirebaseAuthException catch (e) {

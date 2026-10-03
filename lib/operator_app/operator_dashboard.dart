@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
 import 'package:parking_management_system/operator_app/settings_operator.dart';
+import '../auth_wrapper.dart';
 import '../login_screen.dart';
+import '../services/app_data_cache.dart';
 import '../services/auth.dart';
+import 'Active_Vehicles_screen.dart';
+import 'analytics_screen.dart';
 import 'carin_screen.dart';
+import 'carout_screen.dart';
 import 'oDashboard_screen.dart';
 import 'operator_appbar.dart';
 import 'operator_sidebar.dart';
+import 'out_cars_screen.dart';
+import 'reports_screen.dart';
 
 class OperatorDashboard extends StatefulWidget {
   const OperatorDashboard({super.key});
@@ -19,6 +26,9 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
   String get _currentTitle {
     if (_currentPage is CarinScreen) {
       return 'Car In';
+    }
+    if (_currentPage is CaroutScreen) {
+      return 'Car Out';
     }
 
     return _titles[_selectedIndex];
@@ -34,6 +44,7 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
   static const List<String> _titles = [
     'Dashboard',
     'Active Vehicles',
+    'Out Cars',
     'Reports',
     'Payment',
     'Analytics',
@@ -41,54 +52,52 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
     'Settings',
   ];
 
+  late final List<Widget> _pages;
+  int _reportVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Preload location and active tickets in memory for fast switching
+    AppDataCache.instance.preloadForCurrentUser();
+
+    _pages = [
+      OperatorDashboardBody(
+        onCarIn: _openCarIn,
+        onCarOut: _openCarOut,
+      ),
+      const ActiveVehiclesScreen(),
+      const OutCarsScreen(),
+      const ReportsScreen(),
+      const _PlaceholderPage(
+        icon: Icons.payment,
+        label: 'Payment',
+      ),
+      const AnalyticsScreen(),
+      const _PlaceholderPage(
+        icon: Icons.backup,
+        label: 'Backup',
+      ),
+      const SettingScreenOperator(),
+    ];
+  }
+
   void _onItemSelected(int index) {
+    // These screens load their report snapshots on mount. Recreate them when
+    // opened so a checkout performed elsewhere in the session is reflected.
+    if (index == 2 || index == 3 || index == 5) _reportVersion++;
+    if (index == 2) {
+      _pages[index] = OutCarsScreen(key: ValueKey('outcars-$_reportVersion'));
+    }
+    if (index == 3) {
+      _pages[index] = ReportsScreen(key: ValueKey('reports-$_reportVersion'));
+    }
+    if (index == 5) {
+      _pages[index] = AnalyticsScreen(key: ValueKey('analytics-$_reportVersion'));
+    }
     setState(() {
       _selectedIndex = index;
-
-      switch (index) {
-        case 0:
-          _currentPage = null; // Dashboard
-          break;
-
-        case 1:
-          _currentPage = const _PlaceholderPage(
-            icon: Icons.directions_car,
-            label: 'Active Vehicles',
-          );
-          break;
-
-        case 2:
-          _currentPage = const _PlaceholderPage(
-            icon: Icons.assessment,
-            label: 'Reports',
-          );
-          break;
-
-        case 3:
-          _currentPage = const _PlaceholderPage(
-            icon: Icons.payment,
-            label: 'Payment',
-          );
-          break;
-
-        case 4:
-          _currentPage = const _PlaceholderPage(
-            icon: Icons.analytics,
-            label: 'Analytics',
-          );
-          break;
-
-        case 5:
-          _currentPage = const _PlaceholderPage(
-            icon: Icons.backup,
-            label: 'Backup',
-          );
-          break;
-
-        case 6:
-          _currentPage = const SettingScreenOperator();
-          break;
-      }
+      _currentPage = null;
     });
 
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
@@ -126,13 +135,14 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
     if (shouldLogout != true) return;
 
     try {
+      AppDataCache.instance.clear();
       await _auth.logout();
 
       if (!mounted) return;
 
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
+          builder: (_) => const AuthWrapper(),
         ),
             (route) => false,
       );
@@ -151,6 +161,13 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
   void _openCarIn() {
     setState(() {
       _currentPage = CarinScreen(
+        onBack: _backToDashboard,
+      );
+    });
+  }
+  void _openCarOut() {
+    setState(() {
+      _currentPage = CaroutScreen(
         onBack: _backToDashboard,
       );
     });
@@ -195,9 +212,11 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
                     Expanded(
                       child: Container(
                         color: Theme.of(context).colorScheme.surface,
-                        child: _currentPage ?? OperatorDashboardBody(
-                          onCarIn: _openCarIn,
-                        ),
+                        child: _currentPage ??
+                            IndexedStack(
+                              index: _selectedIndex,
+                              children: _pages,
+                            ),
                       ),
                     ),
                   ],

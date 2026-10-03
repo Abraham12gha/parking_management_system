@@ -17,6 +17,10 @@ class ParkingTicketModel {
   final String locationName;
 
   final String operatorId;
+  final String entryOperatorId;
+  final String entryOperatorName;
+  final String exitOperatorId;
+  final String exitOperatorName;
 
   final Timestamp? startTime;
   final Timestamp? endTime;
@@ -44,6 +48,10 @@ class ParkingTicketModel {
     required this.locationNumericId,
     required this.locationName,
     required this.operatorId,
+    this.entryOperatorId = '',
+    this.entryOperatorName = '',
+    this.exitOperatorId = '',
+    this.exitOperatorName = '',
     required this.startTime,
     required this.endTime,
     required this.graceTimeSeconds,
@@ -75,6 +83,11 @@ class ParkingTicketModel {
       locationName: data['locationName'] as String? ?? '',
 
       operatorId: data['operatorId'] as String? ?? '',
+      entryOperatorId: data['entryOperatorId'] as String? ??
+          data['operatorId'] as String? ?? '',
+      entryOperatorName: data['entryOperatorName'] as String? ?? '',
+      exitOperatorId: data['exitOperatorId'] as String? ?? '',
+      exitOperatorName: data['exitOperatorName'] as String? ?? '',
 
       startTime: data['startTime'] as Timestamp?,
       endTime: data['endTime'] as Timestamp?,
@@ -86,7 +99,12 @@ class ParkingTicketModel {
       (data['parkingCharges'] as num?)?.toDouble() ?? 0,
 
       charges:
-      (data['charges'] as num?)?.toDouble() ?? 0,
+          ((data['checkoutAmount'] ??
+                      data['finalParkingCharges'] ??
+                      data['charges'])
+                  as num?)
+              ?.toDouble() ??
+          0,
 
       status: data['status'] as String? ?? 'in',
       date: data['date'] as String? ?? '',
@@ -112,6 +130,10 @@ class ParkingTicketModel {
       'locationName': locationName,
 
       'operatorId': operatorId,
+      'entryOperatorId': entryOperatorId.isEmpty ? operatorId : entryOperatorId,
+      'entryOperatorName': entryOperatorName,
+      'exitOperatorId': exitOperatorId,
+      'exitOperatorName': exitOperatorName,
 
       'startTime': startTime,
       'endTime': endTime,
@@ -141,6 +163,10 @@ class ParkingTicketModel {
     int? locationNumericId,
     String? locationName,
     String? operatorId,
+    String? entryOperatorId,
+    String? entryOperatorName,
+    String? exitOperatorId,
+    String? exitOperatorName,
     Timestamp? startTime,
     Timestamp? endTime,
     int? graceTimeSeconds,
@@ -163,6 +189,10 @@ class ParkingTicketModel {
       locationNumericId: locationNumericId ?? this.locationNumericId,
       locationName: locationName ?? this.locationName,
       operatorId: operatorId ?? this.operatorId,
+      entryOperatorId: entryOperatorId ?? this.entryOperatorId,
+      entryOperatorName: entryOperatorName ?? this.entryOperatorName,
+      exitOperatorId: exitOperatorId ?? this.exitOperatorId,
+      exitOperatorName: exitOperatorName ?? this.exitOperatorName,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       graceTimeSeconds:

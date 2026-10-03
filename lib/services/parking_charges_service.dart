@@ -1,13 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'app_data_cache.dart';
 
 class ParkingChargeService {
   static int? _cachedCharge;
   static String? _cachedLocationId;
 
-  static int? get cachedCharge => _cachedCharge;
+  static int? get cachedCharge {
+    if (AppDataCache.instance.isLoaded && AppDataCache.instance.parkingCharges > 0) {
+      return AppDataCache.instance.parkingCharges;
+    }
+    return _cachedCharge;
+  }
 
   static Future<int?> loadCharge({bool forceRefresh = false}) async {
+    if (AppDataCache.instance.isLoaded && AppDataCache.instance.parkingCharges > 0 && !forceRefresh) {
+      return AppDataCache.instance.parkingCharges;
+    }
     if (!forceRefresh && _cachedCharge != null) {
       return _cachedCharge;
     }

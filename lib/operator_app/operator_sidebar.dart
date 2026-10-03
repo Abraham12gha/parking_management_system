@@ -30,6 +30,7 @@ class OperatorSidebar extends StatelessWidget {
   static const List<SidebarItem> items = [
     SidebarItem(icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard_rounded, label: 'Dashboard'),
     SidebarItem(icon: Icons.directions_car, selectedIcon: Icons.directions_car, label: 'Active Vehicles'),
+    SidebarItem(icon: Icons.exit_to_app_rounded, selectedIcon: Icons.exit_to_app_rounded, label: 'Out Cars'),
     SidebarItem(icon: Icons.analytics_outlined, selectedIcon: Icons.analytics_outlined, label: 'Reports'),
     SidebarItem(icon: Icons.payments, selectedIcon: Icons.payments, label: 'Payment Methods'),
     SidebarItem(icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart_rounded, label: 'Analytics'),

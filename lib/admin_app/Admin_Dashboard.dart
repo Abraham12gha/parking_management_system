@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
+import '../auth_wrapper.dart';
 import '../login_screen.dart';
+import '../operator_app/analytics_screen.dart';
+import '../operator_app/reports_screen.dart';
+import '../services/app_data_cache.dart';
 import '../services/auth.dart';
 import 'add_location.dart';
 import 'admin_appbar.dart';
@@ -20,7 +24,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Auth _auth = Auth();
 
-
   int _selectedIndex = 0;
   bool _showAddOperator = false;
 
@@ -32,11 +35,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
     'Locations',
     'Payment',
     'Analytics',
-    'Request',
+    'Reports',
     'Settings',
   ];
 
-  List<Widget> get _pages => [
+  @override
+  void initState() {
+    super.initState();
+    AppDataCache.instance.preloadForCurrentUser();
+  }
+
+  late final List<Widget> _pages = [
     const DashboardScreen(),
 
     OperatorList(
@@ -49,8 +58,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     const AddLocationAdmin(),
     const DashboardScreen(),
-    const DashboardScreen(),
-    const DashboardScreen(),
+    const AnalyticsScreen(
+      locationIdOverride: 'ALL',
+      locationNameOverride: 'All Locations (System-Wide)',
+    ),
+    const ReportsScreen(
+      locationIdOverride: 'ALL',
+      locationNameOverride: 'All Locations (System-Wide)',
+    ),
     const SettingsScreen(),
   ];
 
@@ -95,6 +110,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (shouldLogout != true) return;
 
     try {
+      AppDataCache.instance.clear();
       await _auth.logout();
 
       if (!mounted) return;
@@ -103,7 +119,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       // Replace LoginScreen() with your actual login screen widget.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
+          builder: (_) => const AuthWrapper(),
         ),
             (route) => false,
       );

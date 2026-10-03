@@ -1,6 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../services/parking_charges_service.dart';
@@ -41,11 +40,24 @@ class _CarinScreenState extends State<CarinScreen> {
   bool _isSaving = false;
   Future<void> _generateTicket() async {
     // Vehicle number is mandatory.
-    final vehicleNumber = _vehicleNumberController.text.trim();
+    final vehicleNumber = _vehicleNumberController.text.trim().toUpperCase();
 
     if (vehicleNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter the vehicle number.')),
+      );
+      return;
+    }
+
+    final plateRegex = RegExp(r'^[A-Z]{3}-\d{3,4}$');
+    if (!plateRegex.hasMatch(vehicleNumber)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text(
+            'Invalid format! Vehicle number must be ABC-123 or ABC-1234 (e.g. LEA-123 or KHI-1234).',
+          ),
+        ),
       );
       return;
     }
@@ -124,8 +136,7 @@ class _CarinScreenState extends State<CarinScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _DialogHeader(onClose: widget.onBack),
-                  Flexible(
-                    child: SingleChildScrollView(
+                  SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +174,6 @@ class _CarinScreenState extends State<CarinScreen> {
                           ),
                         ],
                       ),
-                    ),
                   ),
                   _DialogFooter(
                     onCancel: widget.onBack,
@@ -477,8 +487,11 @@ class _VehicleDetailsForm extends StatelessWidget {
                 label: 'Vehicle Number',
                 isRequired: true,
                 controller: vehicleNumberController,
-                hintText: 'E.g. ABC-1234',
+                hintText: 'ABC-123 or ABC-1234',
+                helperText: 'Required: ABC-123 or ABC-1234',
                 icon: Icons.badge_outlined,
+                inputFormatters: [LicensePlateFormatter()],
+                textCapitalization: TextCapitalization.characters,
               ),
             ),
             const SizedBox(width: 16),
@@ -530,16 +543,22 @@ class _FormField extends StatelessWidget {
   final bool isRequired;
   final TextEditingController controller;
   final String hintText;
+  final String? helperText;
   final IconData icon;
   final int maxLines;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextCapitalization textCapitalization;
 
   const _FormField({
     required this.label,
     this.isRequired = false,
     required this.controller,
     required this.hintText,
+    this.helperText,
     required this.icon,
     this.maxLines = 1,
+    this.inputFormatters,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -572,10 +591,13 @@ class _FormField extends StatelessWidget {
         TextField(
           controller: controller,
           maxLines: maxLines,
-          // Notes gets its icon aligned to the top instead of centered.
+          inputFormatters: inputFormatters,
+          textCapitalization: textCapitalization,
           textAlignVertical: maxLines > 1 ? null : TextAlignVertical.center,
           decoration: InputDecoration(
             hintText: hintText,
+            helperText: helperText,
+            helperStyle: const TextStyle(fontSize: 11, color: Color(0xFF757575)),
             hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
             prefixIcon: maxLines > 1
                 ? Padding(
@@ -610,6 +632,56 @@ class _FormField extends StatelessWidget {
   }
 }
 
+/// Formatter that automatically forces uppercase and formats license plates
+/// as ABC-123 or ABC-1234.
+class LicensePlateFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    String text = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9\-]'), '');
+
+    // Disallow leading hyphen or digits
+    if (text.startsWith('-') || RegExp(r'^[0-9]').hasMatch(text)) {
+      text = text.replaceAll(RegExp(r'^[^A-Z]+'), '');
+    }
+
+    if (text.contains('-')) {
+      final parts = text.split('-');
+      final letters = parts[0].replaceAll(RegExp(r'[^A-Z]'), '');
+      final limitedLetters = letters.length > 3 ? letters.substring(0, 3) : letters;
+
+      final numbers = parts.sublist(1).join('').replaceAll(RegExp(r'[^0-9]'), '');
+      final limitedNumbers = numbers.length > 4 ? numbers.substring(0, 4) : numbers;
+
+      text = '$limitedLetters-$limitedNumbers';
+    } else {
+      if (text.length > 3) {
+        final letters = text.substring(0, 3).replaceAll(RegExp(r'[^A-Z]'), '');
+        final rest = text.substring(3).replaceAll(RegExp(r'[^0-9]'), '');
+        final limitedNumbers = rest.length > 4 ? rest.substring(0, 4) : rest;
+        if (letters.length == 3) {
+          text = '$letters-$limitedNumbers';
+        } else {
+          text = letters;
+        }
+      } else {
+        text = text.replaceAll(RegExp(r'[^A-Z]'), '');
+      }
+    }
+
+    if (text.length > 8) {
+      text = text.substring(0, 8);
+    }
+
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
 class _DialogFooter extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onGenerateTicket;
@@ -634,8 +706,10 @@ class _DialogFooter extends StatelessWidget {
           bottomRight: Radius.circular(16),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 8,
+        alignment: WrapAlignment.end,
         children: [
           OutlinedButton(
             onPressed: isSaving ? null : onCancel,

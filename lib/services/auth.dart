@@ -9,6 +9,8 @@ class Auth {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  final Map<String, String> _roleCache = {};
+
   // ============================================================
   // LOGIN
   // ============================================================
@@ -27,6 +29,7 @@ class Auth {
   // ============================================================
 
   Future<void> logout() async {
+    _roleCache.clear();
     await _authService.signOut();
   }
 
@@ -48,7 +51,13 @@ class Auth {
   // GET USER ROLE
   // ============================================================
 
+  String? getCachedRole(String uid) => _roleCache[uid];
+
   Future<String?> getUserRole(String uid) async {
+    if (_roleCache.containsKey(uid)) {
+      return _roleCache[uid];
+    }
+
     final document = await _firestore.collection('users').doc(uid).get();
 
     if (!document.exists) {
@@ -56,8 +65,13 @@ class Auth {
     }
 
     final data = document.data();
+    final role = data?['role'] as String?;
 
-    return data?['role'] as String?;
+    if (role != null) {
+      _roleCache[uid] = role;
+    }
+
+    return role;
   }
 
   // ============================================================
