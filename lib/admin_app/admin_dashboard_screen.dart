@@ -10,10 +10,7 @@ import '../services/location_service.dart';
 class AdminDashboardScreen extends StatefulWidget {
   final void Function(int index)? onNavigate;
 
-  const AdminDashboardScreen({
-    super.key,
-    this.onNavigate,
-  });
+  const AdminDashboardScreen({super.key, this.onNavigate});
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -62,11 +59,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _loadTodayTickets() async {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = todayStart.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+    final todayEnd = todayStart
+        .add(const Duration(days: 1))
+        .subtract(const Duration(milliseconds: 1));
 
     try {
       final tickets = await _cache.getTickets(
-        specificLocationId: _selectedLocationId == 'ALL' ? null : _selectedLocationId,
+        specificLocationId: _selectedLocationId == 'ALL'
+            ? null
+            : _selectedLocationId,
         startDate: todayStart,
         endDate: todayEnd,
       );
@@ -88,7 +89,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // Aggregates for selected scope
   List<ParkingTicketModel> get _scopedTickets {
     if (_selectedLocationId == 'ALL') return _todayTickets;
-    return _todayTickets.where((t) => t.locationId == _selectedLocationId).toList();
+    return _todayTickets
+        .where((t) => t.locationId == _selectedLocationId)
+        .toList();
   }
 
   int get _todayCheckIns => _scopedTickets.length;
@@ -144,20 +147,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           builder: (context, setDialogState) {
             final theme = Theme.of(context);
             final colorScheme = theme.colorScheme;
-            final int totalSeconds = (currentHours * 3600) + (currentMinutes * 60);
+            final int totalSeconds =
+                (currentHours * 3600) + (currentMinutes * 60);
 
             String formattedTime;
             if (currentHours == 0 && currentMinutes == 0) {
               formattedTime = 'No grace period (charges begin immediately)';
             } else {
               final parts = <String>[];
-              if (currentHours > 0) parts.add('$currentHours ${currentHours == 1 ? 'hour' : 'hours'}');
-              if (currentMinutes > 0) parts.add('$currentMinutes ${currentMinutes == 1 ? 'minute' : 'minutes'}');
+              if (currentHours > 0)
+                parts.add(
+                  '$currentHours ${currentHours == 1 ? 'hour' : 'hours'}',
+                );
+              if (currentMinutes > 0)
+                parts.add(
+                  '$currentMinutes ${currentMinutes == 1 ? 'minute' : 'minutes'}',
+                );
               formattedTime = '${parts.join(' ')} free parking';
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: Padding(
@@ -174,7 +186,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               color: colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(Icons.timer_outlined, color: colorScheme.primary, size: 24),
+                            child: Icon(
+                              Icons.timer_outlined,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -183,11 +199,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               children: [
                                 Text(
                                   'Change Grace Time',
-                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 Text(
                                   location.locationName,
-                                  style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
@@ -202,7 +223,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const SizedBox(height: 16),
                       Text(
                         'Set customer free parking grace duration. This updates in real time for all operators currently signed in at this location.',
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade700,
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -210,7 +233,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: theme.dividerColor),
                         ),
@@ -220,43 +245,95 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Expanded(
                               child: Column(
                                 children: [
-                                  const Text('Hours', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const Text(
+                                    'Hours',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        onPressed: currentHours > 0 ? () => setDialogState(() => currentHours--) : null,
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                        ),
+                                        onPressed: currentHours > 0
+                                            ? () => setDialogState(
+                                                () => currentHours--,
+                                              )
+                                            : null,
                                       ),
-                                      Text('$currentHours', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                                      Text(
+                                        '$currentHours',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
-                                        onPressed: currentHours < 24 ? () => setDialogState(() => currentHours++) : null,
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                        ),
+                                        onPressed: currentHours < 24
+                                            ? () => setDialogState(
+                                                () => currentHours++,
+                                              )
+                                            : null,
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
                             ),
-                            Container(width: 1, height: 50, color: theme.dividerColor),
+                            Container(
+                              width: 1,
+                              height: 50,
+                              color: theme.dividerColor,
+                            ),
                             // Minutes
                             Expanded(
                               child: Column(
                                 children: [
-                                  const Text('Minutes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const Text(
+                                    'Minutes',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        onPressed: currentMinutes >= 5 ? () => setDialogState(() => currentMinutes -= 5) : null,
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                        ),
+                                        onPressed: currentMinutes >= 5
+                                            ? () => setDialogState(
+                                                () => currentMinutes -= 5,
+                                              )
+                                            : null,
                                       ),
-                                      Text('$currentMinutes', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                                      Text(
+                                        '$currentMinutes',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
-                                        onPressed: currentMinutes < 55 ? () => setDialogState(() => currentMinutes += 5) : null,
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                        ),
+                                        onPressed: currentMinutes < 55
+                                            ? () => setDialogState(
+                                                () => currentMinutes += 5,
+                                              )
+                                            : null,
                                       ),
                                     ],
                                   ),
@@ -269,37 +346,114 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const SizedBox(height: 16),
 
                       // Quick Presets
-                      const Text('Quick Select:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const Text(
+                        'Quick Select:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _presetChoice('No grace', 0, 0, currentHours, currentMinutes, (h, m) => setDialogState(() { currentHours = h; currentMinutes = m; })),
-                          _presetChoice('10 min', 0, 10, currentHours, currentMinutes, (h, m) => setDialogState(() { currentHours = h; currentMinutes = m; })),
-                          _presetChoice('15 min', 0, 15, currentHours, currentMinutes, (h, m) => setDialogState(() { currentHours = h; currentMinutes = m; })),
-                          _presetChoice('30 min', 0, 30, currentHours, currentMinutes, (h, m) => setDialogState(() { currentHours = h; currentMinutes = m; })),
-                          _presetChoice('45 min', 0, 45, currentHours, currentMinutes, (h, m) => setDialogState(() { currentHours = h; currentMinutes = m; })),
-                          _presetChoice('1 hour', 1, 0, currentHours, currentMinutes, (h, m) => setDialogState(() { currentHours = h; currentMinutes = m; })),
+                          _presetChoice(
+                            'No grace',
+                            0,
+                            0,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) => setDialogState(() {
+                              currentHours = h;
+                              currentMinutes = m;
+                            }),
+                          ),
+                          _presetChoice(
+                            '10 min',
+                            0,
+                            10,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) => setDialogState(() {
+                              currentHours = h;
+                              currentMinutes = m;
+                            }),
+                          ),
+                          _presetChoice(
+                            '15 min',
+                            0,
+                            15,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) => setDialogState(() {
+                              currentHours = h;
+                              currentMinutes = m;
+                            }),
+                          ),
+                          _presetChoice(
+                            '30 min',
+                            0,
+                            30,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) => setDialogState(() {
+                              currentHours = h;
+                              currentMinutes = m;
+                            }),
+                          ),
+                          _presetChoice(
+                            '45 min',
+                            0,
+                            45,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) => setDialogState(() {
+                              currentHours = h;
+                              currentMinutes = m;
+                            }),
+                          ),
+                          _presetChoice(
+                            '1 hour',
+                            1,
+                            0,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) => setDialogState(() {
+                              currentHours = h;
+                              currentMinutes = m;
+                            }),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
 
                       // Preview
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.check_circle_outline, color: colorScheme.primary, size: 18),
+                            Icon(
+                              Icons.check_circle_outline,
+                              color: colorScheme.primary,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 formattedTime,
-                                style: TextStyle(fontWeight: FontWeight.w600, color: colorScheme.primary, fontSize: 13),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.primary,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ],
@@ -322,8 +476,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
                               foregroundColor: colorScheme.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
                             ),
                             onPressed: () async {
                               Navigator.of(dialogCtx).pop();
@@ -345,7 +504,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               } catch (e) {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(backgroundColor: Colors.redAccent, content: Text('Error: $e')),
+                                    SnackBar(
+                                      backgroundColor: Colors.redAccent,
+                                      content: Text('Error: $e'),
+                                    ),
                                   );
                                 }
                               }
@@ -374,7 +536,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   ) {
     final isSelected = curH == h && curM == m;
     return ChoiceChip(
-      label: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
       selected: isSelected,
       onSelected: (_) => onSelect(h, m),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -428,31 +596,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildTopFilterHeader(BuildContext context, String dateStr, bool isDesktop) {
+  Widget _buildTopFilterHeader(
+    BuildContext context,
+    String dateStr,
+    bool isDesktop,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     if (!isDesktop) {
       return Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: theme.dividerColor)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Admin Live Dashboard', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(dateStr, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _selectedLocationId,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder()),
-            items: [const DropdownMenuItem(value: 'ALL', child: Text('All Facilities')), ..._locations.map((loc) => DropdownMenuItem(value: loc.id, child: Text(loc.locationName, overflow: TextOverflow.ellipsis)))],
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() { _selectedLocationId = value; _isLoadingTickets = true; });
-              _loadTodayTickets();
-            },
-          ),
-        ]),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Admin Live Dashboard',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(dateStr, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedLocationId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Location',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem(
+                  value: 'ALL',
+                  child: Text('All Facilities'),
+                ),
+                ..._locations.map(
+                  (loc) => DropdownMenuItem(
+                    value: loc.id,
+                    child: Text(
+                      loc.locationName,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _selectedLocationId = value;
+                  _isLoadingTickets = true;
+                });
+                _loadTodayTickets();
+              },
+            ),
+          ],
+        ),
       );
     }
 
@@ -471,7 +675,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               color: colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.dashboard_rounded, color: colorScheme.primary, size: 28),
+            child: Icon(
+              Icons.dashboard_rounded,
+              color: colorScheme.primary,
+              size: 28,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -480,20 +688,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   'Admin Live Dashboard',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade600),
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: Colors.grey.shade600,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       dateStr,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey.shade700,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
@@ -501,9 +720,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.fiber_manual_record, size: 10, color: Color(0xFF2E7D32)),
+                          Icon(
+                            Icons.fiber_manual_record,
+                            size: 10,
+                            color: Color(0xFF2E7D32),
+                          ),
                           SizedBox(width: 4),
-                          Text('LIVE SYNC ACTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                          Text(
+                            'LIVE SYNC ACTIVE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E7D32),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -542,7 +772,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         Icon(Icons.domain_rounded, size: 18),
                         SizedBox(width: 8),
-                        Text('All Facilities (System-Wide)', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          'All Facilities (System-Wide)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
                   ),
@@ -587,57 +820,75 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context, snapshot) {
         final activeVehicles = snapshot.data ?? [];
         final activeCount = activeVehicles.length;
+        final cards = [
+          // 1. Live Parked Vehicles
+          _kpiCard(
+            context,
+            title: 'Active Vehicles Inside',
+            value: '$activeCount',
+            subtitle: 'Currently Parked',
+            icon: Icons.directions_car_filled_rounded,
+            color: const Color(0xFF1976D2),
+            badge: 'LIVE',
+            badgeColor: const Color(0xFF2E7D32),
+          ),
 
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: isDesktop ? 4 : 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: isDesktop ? 1.7 : 1.35,
-          children: [
-            // 1. Live Parked Vehicles
-            _kpiCard(
-              context,
-              title: 'Active Vehicles Inside',
-              value: '$activeCount',
-              subtitle: 'Currently Parked',
-              icon: Icons.directions_car_filled_rounded,
-              color: const Color(0xFF1976D2),
-              badge: 'LIVE',
-              badgeColor: const Color(0xFF2E7D32),
-            ),
+          // 2. Today's Total Check-Ins
+          _kpiCard(
+            context,
+            title: "Today's Total Entries",
+            value: '$_todayCheckIns',
+            subtitle: 'Check-In Volume',
+            icon: Icons.login_rounded,
+            color: const Color(0xFF00796B),
+          ),
 
-            // 2. Today's Total Check-Ins
-            _kpiCard(
-              context,
-              title: "Today's Total Entries",
-              value: '$_todayCheckIns',
-              subtitle: 'Check-In Volume',
-              icon: Icons.login_rounded,
-              color: const Color(0xFF00796B),
-            ),
+          // 3. Today's Total Check-Outs
+          _kpiCard(
+            context,
+            title: "Today's Total Exits",
+            value: '$_todayCheckOuts',
+            subtitle: 'Turnover Completed',
+            icon: Icons.logout_rounded,
+            color: const Color(0xFFE65100),
+          ),
 
-            // 3. Today's Total Check-Outs
-            _kpiCard(
-              context,
-              title: "Today's Total Exits",
-              value: '$_todayCheckOuts',
-              subtitle: 'Turnover Completed',
-              icon: Icons.logout_rounded,
-              color: const Color(0xFFE65100),
-            ),
+          // 4. Today's Revenue
+          _kpiCard(
+            context,
+            title: "Today's Revenue",
+            value: 'Rs. ${_todayRevenue.toStringAsFixed(0)}',
+            subtitle: 'Excludes Free Grace Exits',
+            icon: Icons.payments_rounded,
+            color: const Color(0xFF512DA8),
+          ),
+        ];
 
-            // 4. Today's Revenue
-            _kpiCard(
-              context,
-              title: "Today's Revenue",
-              value: 'Rs. ${_todayRevenue.toStringAsFixed(0)}',
-              subtitle: 'Excludes Free Grace Exits',
-              icon: Icons.payments_rounded,
-              color: const Color(0xFF512DA8),
-            ),
-          ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final columns = width >= 1050
+                ? 4
+                : width >= 560
+                ? 2
+                : 1;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                mainAxisExtent: columns == 1
+                    ? 164
+                    : columns == 2
+                    ? 176
+                    : 160,
+              ),
+              itemCount: cards.length,
+              itemBuilder: (context, index) => cards[index],
+            );
+          },
         );
       },
     );
@@ -687,7 +938,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               if (badge != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: (badgeColor ?? color).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
@@ -731,7 +985,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Text(
                 title,
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
@@ -765,38 +1021,94 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(builder: (context, constraints) => constraints.maxWidth < 650
-          ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [Icon(Icons.timer_outlined, color: colorScheme.primary, size: 22), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Facilities & Grace Periods Quick Control', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)), Text('Change grace times across facilities. All operators receive instant real-time synchronization.', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600))]))]),
-              const SizedBox(height: 10),
-              Align(alignment: Alignment.centerRight, child: OutlinedButton.icon(onPressed: () => widget.onNavigate?.call(2), icon: const Icon(Icons.manage_accounts_rounded, size: 16), label: const Text('Manage All Locations'))),
-            ])
-          : Row(
-            children: [
-              Icon(Icons.timer_outlined, color: colorScheme.primary, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Facilities & Grace Periods Quick Control',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'Change grace times across facilities. All operators receive instant real-time synchronization.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-                    ),
-                  ],
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => widget.onNavigate?.call(2), // Navigate to Locations tab
-                icon: const Icon(Icons.manage_accounts_rounded, size: 16),
-                label: const Text('Manage All Locations'),
-              ),
-            ],
-          )),
+          LayoutBuilder(
+            builder: (context, constraints) => constraints.maxWidth < 650
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            color: colorScheme.primary,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Facilities & Grace Periods Quick Control',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Change grace times across facilities. All operators receive instant real-time synchronization.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () => widget.onNavigate?.call(2),
+                          icon: const Icon(
+                            Icons.manage_accounts_rounded,
+                            size: 16,
+                          ),
+                          label: const Text('Manage All Locations'),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Facilities & Grace Periods Quick Control',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Change grace times across facilities. All operators receive instant real-time synchronization.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => widget.onNavigate?.call(
+                          2,
+                        ), // Navigate to Locations tab
+                        icon: const Icon(
+                          Icons.manage_accounts_rounded,
+                          size: 16,
+                        ),
+                        label: const Text('Manage All Locations'),
+                      ),
+                    ],
+                  ),
+          ),
           const SizedBox(height: 16),
           Divider(color: theme.dividerColor, height: 1),
           const SizedBox(height: 16),
@@ -811,7 +1123,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _locations.length,
-              separatorBuilder: (_, __) => Divider(color: theme.dividerColor.withValues(alpha: 0.5)),
+              separatorBuilder: (_, __) =>
+                  Divider(color: theme.dividerColor.withValues(alpha: 0.5)),
               itemBuilder: (context, index) {
                 final loc = _locations[index];
                 return _buildFleetLocationRow(context, loc);
@@ -838,8 +1151,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              location.numericId > 0 ? '#LOC-${location.numericId.toString().padLeft(2, '0')}' : '#LOC',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: colorScheme.primary),
+              location.numericId > 0
+                  ? '#LOC-${location.numericId.toString().padLeft(2, '0')}'
+                  : '#LOC',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: colorScheme.primary,
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -850,7 +1169,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(location.locationName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+                Text(
+                  location.locationName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.5,
+                  ),
+                ),
                 Text(
                   location.address,
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
@@ -866,9 +1191,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             flex: 2,
             child: Row(
               children: [
-                const Icon(Icons.payments_outlined, size: 16, color: Color(0xFF1976D2)),
+                const Icon(
+                  Icons.payments_outlined,
+                  size: 16,
+                  color: Color(0xFF1976D2),
+                ),
                 const SizedBox(width: 6),
-                Text('Rs. ${location.parkingCharges}/hr', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(
+                  'Rs. ${location.parkingCharges}/hr',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),
@@ -890,15 +1225,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Icon(
                     Icons.timer_outlined,
                     size: 15,
-                    color: location.graceTimeSeconds > 0 ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+                    color: location.graceTimeSeconds > 0
+                        ? const Color(0xFF2E7D32)
+                        : Colors.grey.shade700,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    location.graceTimeSeconds > 0 ? location.formattedGraceTime : 'No Grace',
+                    location.graceTimeSeconds > 0
+                        ? location.formattedGraceTime
+                        : 'No Grace',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: location.graceTimeSeconds > 0 ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+                      color: location.graceTimeSeconds > 0
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey.shade700,
                     ),
                   ),
                 ],
@@ -916,7 +1257,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               foregroundColor: colorScheme.onPrimary,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ],
@@ -951,17 +1294,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Today\'s Hourly Traffic Inflow', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        Text('Entry volume distribution by hour (Peak congestion analysis)', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+                        Text(
+                          'Today\'s Hourly Traffic Inflow',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Entry volume distribution by hour (Peak congestion analysis)',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text('Peak: $_peakHourString', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: colorScheme.primary)),
+                      child: Text(
+                        'Peak: $_peakHourString',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: colorScheme.primary,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -986,8 +1349,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Vehicle Categories', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                Text('Traffic composition breakdown', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+                Text(
+                  'Vehicle Categories',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Traffic composition breakdown',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
+                ),
                 const SizedBox(height: 20),
                 _buildCategoryBreakdown(context),
               ],
@@ -1033,7 +1406,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: isRush ? FontWeight.bold : FontWeight.normal,
-                      color: isRush ? colorScheme.primary : Colors.grey.shade700,
+                      color: isRush
+                          ? colorScheme.primary
+                          : Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1043,7 +1418,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     decoration: BoxDecoration(
                       color: isRush
                           ? colorScheme.primary
-                          : colorScheme.primary.withValues(alpha: count > 0 ? 0.45 : 0.1),
+                          : colorScheme.primary.withValues(
+                              alpha: count > 0 ? 0.45 : 0.1,
+                            ),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -1081,16 +1458,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     return Column(
       children: [
-        _categoryBar('Valet Parking', valet, total, const Color(0xFF512DA8), Icons.room_service_rounded),
+        _categoryBar(
+          'Valet Parking',
+          valet,
+          total,
+          const Color(0xFF512DA8),
+          Icons.room_service_rounded,
+        ),
         const SizedBox(height: 14),
-        _categoryBar('Self Parking', self, total, const Color(0xFF2E7D32), Icons.directions_car_rounded),
+        _categoryBar(
+          'Self Parking',
+          self,
+          total,
+          const Color(0xFF2E7D32),
+          Icons.directions_car_rounded,
+        ),
         const SizedBox(height: 14),
-        _categoryBar('Bike / Motorcycle', bike, total, const Color(0xFF00838F), Icons.two_wheeler_rounded),
+        _categoryBar(
+          'Bike / Motorcycle',
+          bike,
+          total,
+          const Color(0xFF00838F),
+          Icons.two_wheeler_rounded,
+        ),
       ],
     );
   }
 
-  Widget _categoryBar(String label, int count, int total, Color color, IconData icon) {
+  Widget _categoryBar(
+    String label,
+    int count,
+    int total,
+    Color color,
+    IconData icon,
+  ) {
     final pct = (count / total * 100).toStringAsFixed(1);
 
     return Column(
@@ -1100,9 +1501,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
             const Spacer(),
-            Text('$count ($pct%)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: color)),
+            Text(
+              '$count ($pct%)',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: color,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -1147,12 +1558,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Live System Activity Stream', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  Text('Real-time check-ins and check-outs across facilities', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+                  Text(
+                    'Live System Activity Stream',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Real-time check-ins and check-outs across facilities',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                 ],
               ),
               OutlinedButton.icon(
-                onPressed: () => widget.onNavigate?.call(5), // Navigate to Reports tab
+                onPressed: () =>
+                    widget.onNavigate?.call(5), // Navigate to Reports tab
                 icon: const Icon(Icons.receipt_long_rounded, size: 16),
                 label: const Text('View Full Reports'),
               ),
@@ -1166,14 +1588,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             stream: query.snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
               }
 
               final docs = snapshot.data?.docs ?? [];
               if (docs.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: Text('No recent activity recorded today')),
+                  child: Center(
+                    child: Text('No recent activity recorded today'),
+                  ),
                 );
               }
 
@@ -1181,11 +1610,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: docs.length,
-                separatorBuilder: (_, __) => Divider(color: theme.dividerColor.withValues(alpha: 0.5)),
+                separatorBuilder: (_, __) =>
+                    Divider(color: theme.dividerColor.withValues(alpha: 0.5)),
                 itemBuilder: (context, index) {
                   final ticket = ParkingTicketModel.fromFirestore(docs[index]);
                   final isInside = ticket.status.toLowerCase() == 'in';
-                  final time = (isInside ? ticket.startTime : ticket.endTime)?.toDate() ?? DateTime.now();
+                  final time =
+                      (isInside ? ticket.startTime : ticket.endTime)
+                          ?.toDate() ??
+                      DateTime.now();
                   final timeFormatted = DateFormat('hh:mm a').format(time);
 
                   return ListTile(
@@ -1193,12 +1626,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     leading: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: (isInside ? const Color(0xFF2E7D32) : const Color(0xFFE65100)).withValues(alpha: 0.1),
+                        color:
+                            (isInside
+                                    ? const Color(0xFF2E7D32)
+                                    : const Color(0xFFE65100))
+                                .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         isInside ? Icons.login_rounded : Icons.logout_rounded,
-                        color: isInside ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                        color: isInside
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFFE65100),
                         size: 20,
                       ),
                     ),
@@ -1206,39 +1645,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         Text(
                           ticket.vehicleNumber,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.grey.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             ticket.ticketNumber,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
                     subtitle: Text(
                       '${ticket.locationName} • Operator: ${ticket.entryOperatorName.isNotEmpty ? ticket.entryOperatorName : ticket.operatorId}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          isInside ? 'PARKED' : 'Rs. ${ticket.charges.toStringAsFixed(0)}',
+                          isInside
+                              ? 'PARKED'
+                              : 'Rs. ${ticket.charges.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: isInside ? const Color(0xFF2E7D32) : colorScheme.primary,
+                            color: isInside
+                                ? const Color(0xFF2E7D32)
+                                : colorScheme.primary,
                             fontSize: 13,
                           ),
                         ),
-                        Text(timeFormatted, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        Text(
+                          timeFormatted,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
                       ],
                     ),
                   );

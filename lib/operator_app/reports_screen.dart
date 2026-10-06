@@ -63,9 +63,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
 
     final locId = widget.locationIdOverride ?? _cache.locationId;
-    final tickets = await _cache.getTickets(
-      specificLocationId: locId,
-    );
+    final tickets = await _cache.getTickets(specificLocationId: locId);
 
     if (mounted) {
       setState(() {
@@ -82,7 +80,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   DateTimeRange _getDateRange() {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = todayStart.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+    final todayEnd = todayStart
+        .add(const Duration(days: 1))
+        .subtract(const Duration(milliseconds: 1));
 
     switch (_dateFilter) {
       case ReportDateFilter.today:
@@ -104,8 +104,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
         return DateTimeRange(start: monthStart, end: todayEnd);
 
       case ReportDateFilter.custom:
-        final start = DateTime(_customStartDate.year, _customStartDate.month, _customStartDate.day);
-        final end = DateTime(_customEndDate.year, _customEndDate.month, _customEndDate.day, 23, 59, 59, 999);
+        final start = DateTime(
+          _customStartDate.year,
+          _customStartDate.month,
+          _customStartDate.day,
+        );
+        final end = DateTime(
+          _customEndDate.year,
+          _customEndDate.month,
+          _customEndDate.day,
+          23,
+          59,
+          59,
+          999,
+        );
         return DateTimeRange(start: start, end: end);
     }
   }
@@ -117,21 +129,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       // A gate owns entries it created and exits it processed. This keeps
       // cross-gate revenue on the exit gate's report while preserving active
       // cars on their entry gate's report.
-      final operatorId = _cache.userRole == 'operator' &&
-              widget.locationIdOverride == null
+      final operatorId =
+          _cache.userRole == 'operator' && widget.locationIdOverride == null
           ? _cache.operatorId
           : null;
       final isInside = ticket.status.toLowerCase() == 'in';
       final attributedOperator = isInside
           ? ticket.entryOperatorId
           : (ticket.exitOperatorId.isNotEmpty
-              ? ticket.exitOperatorId
-              : ticket.operatorId); // legacy completed tickets
+                ? ticket.exitOperatorId
+                : ticket.operatorId); // legacy completed tickets
       if (operatorId != null && attributedOperator != operatorId) return false;
 
       // 1. Date Filter
-      final ticketTime = (isInside ? ticket.startTime : ticket.endTime)?.toDate()
-          ?? ticket.startTime?.toDate();
+      final ticketTime =
+          (isInside ? ticket.startTime : ticket.endTime)?.toDate() ??
+          ticket.startTime?.toDate();
       if (ticketTime == null) return false;
       if (ticketTime.isBefore(range.start) || ticketTime.isAfter(range.end)) {
         return false;
@@ -159,7 +172,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         final driver = ticket.driverName.toLowerCase();
         final phone = ticket.phoneNumber.toLowerCase();
 
-        final matches = plate.contains(_searchQuery) ||
+        final matches =
+            plate.contains(_searchQuery) ||
             tNum.contains(_searchQuery) ||
             driver.contains(_searchQuery) ||
             phone.contains(_searchQuery);
@@ -222,7 +236,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final locationName = widget.locationNameOverride ?? _cache.locationName ?? 'Current Facility';
+    final locationName =
+        widget.locationNameOverride ??
+        _cache.locationName ??
+        'Current Facility';
 
     final filtered = _filteredTickets;
 
@@ -241,7 +258,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     onRefresh: _loadData,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -291,35 +311,143 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
       ),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final compact = constraints.maxWidth < 760;
-        final title = Row(
-          children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.assessment_rounded, color: colorScheme.primary, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final title = Row(
             children: [
-              Text(
-                'Parking Reports & Audit',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.onSurface,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.assessment_rounded,
+                  color: colorScheme.primary,
+                  size: 24,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Parking Reports & Audit',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        locationName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface.withValues(alpha: 0.65),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Live Synced',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (!compact) const Spacer(),
+              if (compact) const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () => _showExportDialog(context),
+                icon: const Icon(Icons.print_rounded, size: 18),
+                label: const Text('Export / Print'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          );
+          if (!compact) return title;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  Icon(Icons.location_on_outlined, size: 14, color: colorScheme.primary),
-                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Parking Reports & Audit',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _loadData,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Refresh'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 14,
+                    color: colorScheme.primary,
+                  ),
                   Text(
                     locationName,
                     style: TextStyle(
@@ -328,68 +456,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       color: colorScheme.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Live Synced',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green.shade700,
-                    ),
+                  const Text('• Live Synced'),
+                  ElevatedButton.icon(
+                    onPressed: () => _showExportDialog(context),
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text('Export'),
                   ),
                 ],
               ),
             ],
-          ),
-          if (!compact) const Spacer(),
-          if (compact) const SizedBox(width: 12),
-          OutlinedButton.icon(
-            onPressed: _loadData,
-            icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Refresh'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            onPressed: () => _showExportDialog(context),
-            icon: const Icon(Icons.print_rounded, size: 18),
-            label: const Text('Export / Print'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          ],
-        );
-        if (!compact) return title;
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: Text('Parking Reports & Audit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.onSurface))),
-            OutlinedButton.icon(onPressed: _loadData, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('Refresh')),
-          ]),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Icon(Icons.location_on_outlined, size: 14, color: colorScheme.primary),
-            Text(locationName, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.65))),
-            const Text('• Live Synced'),
-            ElevatedButton.icon(onPressed: () => _showExportDialog(context), icon: const Icon(Icons.download_rounded, size: 18), label: const Text('Export')),
-          ]),
-        ]);
-      }),
+          );
+        },
+      ),
     );
   }
 
@@ -446,7 +524,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
-          children: cards.map((c) => SizedBox(width: cardWidth, child: c)).toList(),
+          children: cards
+              .map((c) => SizedBox(width: cardWidth, child: c))
+              .toList(),
         );
       },
     );
@@ -490,11 +570,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   color: colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
-              _buildDateFilterChip('Today', ReportDateFilter.today, colorScheme),
-              _buildDateFilterChip('Yesterday', ReportDateFilter.yesterday, colorScheme),
-              _buildDateFilterChip('This Week', ReportDateFilter.thisWeek, colorScheme),
-              _buildDateFilterChip('This Month', ReportDateFilter.thisMonth, colorScheme),
-              _buildDateFilterChip('Custom Range', ReportDateFilter.custom, colorScheme),
+              _buildDateFilterChip(
+                'Today',
+                ReportDateFilter.today,
+                colorScheme,
+              ),
+              _buildDateFilterChip(
+                'Yesterday',
+                ReportDateFilter.yesterday,
+                colorScheme,
+              ),
+              _buildDateFilterChip(
+                'This Week',
+                ReportDateFilter.thisWeek,
+                colorScheme,
+              ),
+              _buildDateFilterChip(
+                'This Month',
+                ReportDateFilter.thisMonth,
+                colorScheme,
+              ),
+              _buildDateFilterChip(
+                'Custom Range',
+                ReportDateFilter.custom,
+                colorScheme,
+              ),
             ],
           ),
 
@@ -505,10 +605,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Icon(Icons.date_range_rounded, size: 18, color: Colors.grey),
+                const Icon(
+                  Icons.date_range_rounded,
+                  size: 18,
+                  color: Colors.grey,
+                ),
                 Text(
                   'Range: ${DateFormat('MMM dd, yyyy').format(_customStartDate)} - ${DateFormat('MMM dd, yyyy').format(_customEndDate)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: _pickCustomDateRange,
@@ -522,112 +629,171 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const Divider(height: 24),
 
           // Search + Dropdown Filters
-          LayoutBuilder(builder: (context, constraints) {
-            final compact = constraints.maxWidth < 850;
-            return Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Search Input
-              SizedBox(
-                  width: compact ? constraints.maxWidth : constraints.maxWidth * .42,
-                  height: 42,
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search plate #, ticket #, driver, phone...',
-                      hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurface.withValues(alpha: 0.4),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 850;
+              final narrow = constraints.maxWidth < 380;
+              final selectorWidth = narrow
+                  ? constraints.maxWidth
+                  : compact
+                  ? (constraints.maxWidth - 12) / 2
+                  : 180.0;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Search Input
+                  SizedBox(
+                    width: compact
+                        ? constraints.maxWidth
+                        : constraints.maxWidth * .42,
+                    height: 42,
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search plate #, ticket #, driver, phone...',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          color: colorScheme.onSurface.withValues(alpha: 0.4),
+                        ),
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.25),
                       ),
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                          color: colorScheme.outline.withValues(alpha: 0.2),
+                    ),
+                  ),
+
+                  // Category Selector
+                  SizedBox(
+                    width: selectorWidth,
+                    height: 42,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedCategory,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Category',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'All',
+                          child: Text(
+                            'All Categories',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Valet',
+                          child: Text(
+                            'Valet Parking',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Self',
+                          child: Text('Self Parking'),
+                        ),
+                        DropdownMenuItem(value: 'Bike', child: Text('Bike')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null)
+                          setState(() => _selectedCategory = val);
+                      },
                     ),
                   ),
-              ),
 
-              // Category Selector
-              SizedBox(
-                width: compact ? (constraints.maxWidth - 12) / 2 : 180,
-                height: 42,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
-                  decoration: InputDecoration(
-                    labelText: 'Category',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  // Status Selector
+                  SizedBox(
+                    width: selectorWidth,
+                    height: 42,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedStatus,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Status',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'All',
+                          child: Text('All Status'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Exited',
+                          child: Text(
+                            'Completed (Out)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Active',
+                          child: Text(
+                            'Active (Inside)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedStatus = val);
+                      },
                     ),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'All', child: Text('All Categories')),
-                    DropdownMenuItem(value: 'Valet', child: Text('Valet Parking')),
-                    DropdownMenuItem(value: 'Self', child: Text('Self Parking')),
-                    DropdownMenuItem(value: 'Bike', child: Text('Bike')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedCategory = val);
-                  },
-                ),
-              ),
 
-
-              // Status Selector
-              SizedBox(
-                width: compact ? (constraints.maxWidth - 12) / 2 : 170,
-                height: 42,
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedStatus,
-                  decoration: InputDecoration(
-                    labelText: 'Status',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  if (_searchQuery.isNotEmpty ||
+                      _selectedCategory != 'All' ||
+                      _selectedStatus != 'All')
+                    IconButton(
+                      tooltip: 'Reset Filters',
+                      icon: const Icon(
+                        Icons.filter_alt_off_rounded,
+                        color: Colors.redAccent,
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _selectedCategory = 'All';
+                          _selectedStatus = 'All';
+                          _searchQuery = '';
+                        });
+                      },
                     ),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'All', child: Text('All Status')),
-                    DropdownMenuItem(value: 'Exited', child: Text('Completed (Out)')),
-                    DropdownMenuItem(value: 'Active', child: Text('Active (Inside)')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedStatus = val);
-                  },
-                ),
-              ),
-
-
-              if (_searchQuery.isNotEmpty || _selectedCategory != 'All' || _selectedStatus != 'All')
-                IconButton(
-                  tooltip: 'Reset Filters',
-                  icon: const Icon(Icons.filter_alt_off_rounded, color: Colors.redAccent),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {
-                      _selectedCategory = 'All';
-                      _selectedStatus = 'All';
-                      _searchQuery = '';
-                    });
-                  },
-                ),
-            ],
-          );
-          }),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDateFilterChip(String label, ReportDateFilter filter, ColorScheme colors) {
+  Widget _buildDateFilterChip(
+    String label,
+    ReportDateFilter filter,
+    ColorScheme colors,
+  ) {
     final selected = _dateFilter == filter;
 
     return InkWell(
@@ -642,10 +808,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? colors.primary : colors.surfaceContainerHighest.withValues(alpha: 0.3),
+          color: selected
+              ? colors.primary
+              : colors.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: selected ? colors.primary : colors.outline.withValues(alpha: 0.15),
+            color: selected
+                ? colors.primary
+                : colors.outline.withValues(alpha: 0.15),
           ),
         ),
         child: Text(
@@ -653,7 +823,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           style: TextStyle(
             fontSize: 12.5,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.8),
+            color: selected
+                ? colors.onPrimary
+                : colors.onSurface.withValues(alpha: 0.8),
           ),
         ),
       ),
@@ -665,7 +837,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       context: context,
       firstDate: DateTime(2023),
       lastDate: DateTime.now().add(const Duration(days: 1)),
-      initialDateRange: DateTimeRange(start: _customStartDate, end: _customEndDate),
+      initialDateRange: DateTimeRange(
+        start: _customStartDate,
+        end: _customEndDate,
+      ),
     );
 
     if (picked != null) {
@@ -736,11 +911,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
         decoration: BoxDecoration(
           color: colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.15)),
+          border: Border.all(
+            color: colorScheme.outline.withValues(alpha: 0.15),
+          ),
         ),
         child: Column(
           children: [
-            Icon(Icons.search_off_rounded, size: 56, color: colorScheme.onSurface.withValues(alpha: 0.3)),
+            Icon(
+              Icons.search_off_rounded,
+              size: 56,
+              color: colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 16),
             Text(
               'No parking tickets match your filter criteria',
@@ -792,16 +973,66 @@ class _ReportsScreenState extends State<ReportsScreen> {
               horizontalMargin: 20,
               columnSpacing: 24,
               columns: const [
-                DataColumn(label: Text('TICKET #', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('VEHICLE #', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('CATEGORY', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('DRIVER & PHONE', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('ENTRY TIME', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('EXIT TIME', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('DURATION', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('CHARGES', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('STATUS', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                DataColumn(label: Text('ACTION', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                DataColumn(
+                  label: Text(
+                    'TICKET #',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'VEHICLE #',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'CATEGORY',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'DRIVER & PHONE',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'ENTRY TIME',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'EXIT TIME',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'DURATION',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'CHARGES',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'STATUS',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'ACTION',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
               ],
               rows: tickets.map((ticket) {
                 final start = ticket.startTime?.toDate();
@@ -827,7 +1058,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     DataCell(
                       InkWell(
                         onTap: () {
-                          Clipboard.setData(ClipboardData(text: ticket.ticketNumber));
+                          Clipboard.setData(
+                            ClipboardData(text: ticket.ticketNumber),
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Copied ${ticket.ticketNumber}'),
@@ -839,7 +1072,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              ticket.ticketNumber.isNotEmpty ? ticket.ticketNumber : ticket.id.substring(0, 8),
+                              ticket.ticketNumber.isNotEmpty
+                                  ? ticket.ticketNumber
+                                  : ticket.id.substring(0, 8),
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontWeight: FontWeight.w600,
@@ -848,7 +1083,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            Icon(Icons.copy_rounded, size: 12, color: colorScheme.primary.withValues(alpha: 0.6)),
+                            Icon(
+                              Icons.copy_rounded,
+                              size: 12,
+                              color: colorScheme.primary.withValues(alpha: 0.6),
+                            ),
                           ],
                         ),
                       ),
@@ -857,11 +1096,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     // Vehicle #
                     DataCell(
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.4,
+                          ),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: colorScheme.outline.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Text(
                           ticket.vehicleNumber,
@@ -886,15 +1132,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            ticket.driverName.isNotEmpty ? ticket.driverName : 'Walk-in Driver',
-                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ticket.driverName.isNotEmpty
+                                ? ticket.driverName
+                                : 'Walk-in Driver',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           if (ticket.phoneNumber.isNotEmpty)
                             Text(
                               ticket.phoneNumber,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: colorScheme.onSurface.withValues(alpha: 0.55),
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.55,
+                                ),
                               ),
                             ),
                         ],
@@ -904,7 +1157,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     // Entry Time
                     DataCell(
                       Text(
-                        start != null ? DateFormat('MMM dd, hh:mm a').format(start) : '--',
+                        start != null
+                            ? DateFormat('MMM dd, hh:mm a').format(start)
+                            : '--',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
@@ -914,11 +1169,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       Text(
                         isInside
                             ? 'Still Inside'
-                            : (end != null ? DateFormat('MMM dd, hh:mm a').format(end) : '--'),
+                            : (end != null
+                                  ? DateFormat('MMM dd, hh:mm a').format(end)
+                                  : '--'),
                         style: TextStyle(
                           fontSize: 12,
-                          color: isInside ? Colors.orange.shade800 : colorScheme.onSurface,
-                          fontWeight: isInside ? FontWeight.w600 : FontWeight.normal,
+                          color: isInside
+                              ? Colors.orange.shade800
+                              : colorScheme.onSurface,
+                          fontWeight: isInside
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -927,26 +1188,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     DataCell(
                       Text(
                         durationStr,
-                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
 
                     // Charges
                     DataCell(
                       Text(
-                        isInside ? 'Pending' : 'Rs. ${chargeAmount.toStringAsFixed(0)}',
+                        isInside
+                            ? 'Pending'
+                            : 'Rs. ${chargeAmount.toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: isInside ? Colors.grey : const Color(0xFF2E7D32),
+                          color: isInside
+                              ? Colors.grey
+                              : const Color(0xFF2E7D32),
                         ),
                       ),
                     ),
 
                     // Status
-                    DataCell(
-                      _buildStatusBadge(isInside),
-                    ),
+                    DataCell(_buildStatusBadge(isInside)),
 
                     // Action
                     DataCell(
@@ -1004,7 +1270,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg),
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
           ),
         ],
       ),
@@ -1023,11 +1293,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle)),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Colors.amber,
+                shape: BoxShape.circle,
+              ),
+            ),
             const SizedBox(width: 6),
             Text(
               'PARKED',
-              style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.amber.shade900),
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                color: Colors.amber.shade900,
+              ),
             ),
           ],
         ),
@@ -1044,11 +1325,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 6),
           Text(
             'EXITED',
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.green.shade800),
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: Colors.green.shade800,
+            ),
           ),
         ],
       ),
@@ -1068,14 +1360,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               const Icon(Icons.receipt_rounded, color: Color(0xFF1B5E20)),
               const SizedBox(width: 10),
-              const Text('Parking Ticket Audit', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Parking Ticket Audit',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const Spacer(),
-              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(ctx),
+              ),
             ],
           ),
           content: SizedBox(
@@ -1086,7 +1386,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               children: [
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
@@ -1104,23 +1407,60 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _receiptRow('Vehicle Plate', ticket.vehicleNumber, isBold: true),
+                _receiptRow(
+                  'Vehicle Plate',
+                  ticket.vehicleNumber,
+                  isBold: true,
+                ),
                 _receiptRow('Category', ticket.vehicleCategory.toUpperCase()),
                 _receiptRow('Location', ticket.locationName),
-                _receiptRow('Driver Name', ticket.driverName.isNotEmpty ? ticket.driverName : 'N/A'),
-                _receiptRow('Phone', ticket.phoneNumber.isNotEmpty ? ticket.phoneNumber : 'N/A'),
-                _receiptRow('Check In', start != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(start) : '--'),
-                _receiptRow('Check Out', end != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(end) : 'Still Parked'),
-                _receiptRow('Grace Period', '${ticket.graceTimeSeconds ~/ 60} minutes'),
-                _receiptRow('Status', ticket.status.toUpperCase(), isBold: true),
+                _receiptRow(
+                  'Driver Name',
+                  ticket.driverName.isNotEmpty ? ticket.driverName : 'N/A',
+                ),
+                _receiptRow(
+                  'Phone',
+                  ticket.phoneNumber.isNotEmpty ? ticket.phoneNumber : 'N/A',
+                ),
+                _receiptRow(
+                  'Check In',
+                  start != null
+                      ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(start)
+                      : '--',
+                ),
+                _receiptRow(
+                  'Check Out',
+                  end != null
+                      ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(end)
+                      : 'Still Parked',
+                ),
+                _receiptRow(
+                  'Grace Period',
+                  '${ticket.graceTimeSeconds ~/ 60} minutes',
+                ),
+                _receiptRow(
+                  'Status',
+                  ticket.status.toUpperCase(),
+                  isBold: true,
+                ),
                 const Divider(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Charges:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Total Charges:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Text(
                       'Rs. ${charge.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1B5E20)),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1B5E20),
+                      ),
                     ),
                   ],
                 ),
@@ -1148,12 +1488,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Row(
             children: [
               Icon(Icons.print, color: Color(0xFF1B5E20)),
               SizedBox(width: 10),
-              Text('Audit Report Summary', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'Audit Report Summary',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           content: SizedBox(
@@ -1174,19 +1519,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('REPORT OVERVIEW', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF1B5E20))),
+                        const Text(
+                          'REPORT OVERVIEW',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
                         const SizedBox(height: 6),
-                        Text('Period: $dateRangeStr', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          'Period: $dateRangeStr',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         Text('Total Registered Vehicles: ${filtered.length}'),
                         Text('Completed Exits: $_exitedCount'),
                         Text('Currently Active: $_activeCount'),
-                        Text('Total Revenue Collected: Rs. ${NumberFormat('#,##0').format(_totalRevenue)}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF1B5E20))),
+                        Text(
+                          'Total Revenue Collected: Rs. ${NumberFormat('#,##0').format(_totalRevenue)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Summary text copied to clipboard can be printed or pasted directly into Excel / Google Sheets.'),
+                  const Text(
+                    'Summary text copied to clipboard can be printed or pasted directly into Excel / Google Sheets.',
+                  ),
                 ],
               ),
             ),
@@ -1199,28 +1561,54 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ElevatedButton.icon(
               onPressed: () async {
                 final buffer = StringBuffer();
-                buffer.writeln('Ticket,Vehicle,Category,Entry,Exit,Charges,Status,Entry Gate,Exit Gate');
+                buffer.writeln(
+                  'Ticket,Vehicle,Category,Entry,Exit,Charges,Status,Entry Gate,Exit Gate',
+                );
                 for (final t in filtered) {
-                  final s = t.startTime?.toDate() != null ? DateFormat('yyyy-MM-dd HH:mm').format(t.startTime!.toDate()) : '--';
-                  final e = t.endTime?.toDate() != null ? DateFormat('yyyy-MM-dd HH:mm').format(t.endTime!.toDate()) : 'INSIDE';
+                  final s = t.startTime?.toDate() != null
+                      ? DateFormat(
+                          'yyyy-MM-dd HH:mm',
+                        ).format(t.startTime!.toDate())
+                      : '--';
+                  final e = t.endTime?.toDate() != null
+                      ? DateFormat(
+                          'yyyy-MM-dd HH:mm',
+                        ).format(t.endTime!.toDate())
+                      : 'INSIDE';
                   final c = t.charges > 0 ? t.charges : t.parkingCharges;
-                  final values = [t.ticketNumber, t.vehicleNumber, t.vehicleCategory, s, e,
-                    t.status.toLowerCase() == 'in' ? '' : c.toStringAsFixed(2), t.status,
-                    t.entryOperatorId, t.exitOperatorId];
+                  final values = [
+                    t.ticketNumber,
+                    t.vehicleNumber,
+                    t.vehicleCategory,
+                    s,
+                    e,
+                    t.status.toLowerCase() == 'in' ? '' : c.toStringAsFixed(2),
+                    t.status,
+                    t.entryOperatorId,
+                    t.exitOperatorId,
+                  ];
                   buffer.writeln(values.map(_csvCell).join(','));
                 }
                 try {
-                  final filename = 'parking_report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
-                  final savedTo = await downloadReport(filename, buffer.toString());
+                  final filename =
+                      'parking_report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
+                  final savedTo = await downloadReport(
+                    filename,
+                    buffer.toString(),
+                  );
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Report downloaded: $savedTo'),
-                    backgroundColor: const Color(0xFF1B5E20),
-                  ));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Report downloaded: $savedTo'),
+                      backgroundColor: const Color(0xFF1B5E20),
+                    ),
+                  );
                 } catch (e) {
                   if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not download report: $e')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not download report: $e')),
+                  );
                 }
               },
               icon: const Icon(Icons.download_rounded, size: 18),

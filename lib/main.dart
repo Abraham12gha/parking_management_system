@@ -12,9 +12,7 @@ import 'firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
@@ -23,9 +21,7 @@ void main() async {
 
   // final auth = Auth();
   // await auth.logoutOnAppStart();
-  runApp(
-      const MyApp()
-  );
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -36,32 +32,22 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.light;
-
-  void changeTheme(bool isDark) {
-    setState(() {
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
-        valueListenable: ThemeController.themeMode,
-        builder: (context, mode, child) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
+      valueListenable: ThemeController.themeMode,
+      builder: (context, mode, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
 
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-
-
-            themeMode: mode,
-            home: InternetConnectionBanner(
-          child: AuthWrapper()
-            )
-            );
-          },
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: mode,
+          themeAnimationDuration: const Duration(milliseconds: 350),
+          themeAnimationCurve: Curves.easeInOutCubic,
+          home: const InternetConnectionBanner(child: AuthWrapper()),
+        );
+      },
     );
   }
 }
