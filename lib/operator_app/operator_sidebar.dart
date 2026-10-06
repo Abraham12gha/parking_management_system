@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../resources/widget/company_logo.dart';
 
 /// Model for a single sidebar navigation item.
 class SidebarItem {
@@ -28,14 +29,46 @@ class OperatorSidebar extends StatelessWidget {
   final VoidCallback? onLogout;
 
   static const List<SidebarItem> items = [
-    SidebarItem(icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard_rounded, label: 'Dashboard'),
-    SidebarItem(icon: Icons.directions_car, selectedIcon: Icons.directions_car, label: 'Active Vehicles'),
-    SidebarItem(icon: Icons.exit_to_app_rounded, selectedIcon: Icons.exit_to_app_rounded, label: 'Out Cars'),
-    SidebarItem(icon: Icons.analytics_outlined, selectedIcon: Icons.analytics_outlined, label: 'Reports'),
-    SidebarItem(icon: Icons.payments, selectedIcon: Icons.payments, label: 'Payment Methods'),
-    SidebarItem(icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart_rounded, label: 'Analytics'),
-    SidebarItem(icon: Icons.backup_outlined, selectedIcon: Icons.backup_outlined, label: 'Backup'),
-    SidebarItem(icon: Icons.settings_outlined, selectedIcon: Icons.settings_rounded, label: 'Settings'),
+    SidebarItem(
+      icon: Icons.dashboard_outlined,
+      selectedIcon: Icons.dashboard_rounded,
+      label: 'Dashboard',
+    ),
+    SidebarItem(
+      icon: Icons.directions_car,
+      selectedIcon: Icons.directions_car,
+      label: 'Active Vehicles',
+    ),
+    SidebarItem(
+      icon: Icons.exit_to_app_rounded,
+      selectedIcon: Icons.exit_to_app_rounded,
+      label: 'Out Cars',
+    ),
+    SidebarItem(
+      icon: Icons.analytics_outlined,
+      selectedIcon: Icons.analytics_outlined,
+      label: 'Reports',
+    ),
+    SidebarItem(
+      icon: Icons.payments,
+      selectedIcon: Icons.payments,
+      label: 'Payment Methods',
+    ),
+    SidebarItem(
+      icon: Icons.bar_chart_outlined,
+      selectedIcon: Icons.bar_chart_rounded,
+      label: 'Analytics',
+    ),
+    SidebarItem(
+      icon: Icons.backup_outlined,
+      selectedIcon: Icons.backup_outlined,
+      label: 'Backup',
+    ),
+    SidebarItem(
+      icon: Icons.settings_outlined,
+      selectedIcon: Icons.settings_rounded,
+      label: 'Settings',
+    ),
   ];
 
   @override
@@ -89,12 +122,12 @@ class _Brand extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: colorScheme.onPrimary.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.eco_rounded, color: colorScheme.onPrimary, size: 22),
+            child: const CompanyLogo(size: 28),
           ),
           const SizedBox(width: 12),
           Text(
@@ -138,7 +171,9 @@ class _SidebarTile extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: selected ? colorScheme.onPrimary.withOpacity(0.16) : Colors.transparent,
+              color: selected
+                  ? colorScheme.onPrimary.withOpacity(0.16)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -148,7 +183,9 @@ class _SidebarTile extends StatelessWidget {
                   width: 3,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: selected ? colorScheme.onPrimary : Colors.transparent,
+                    color: selected
+                        ? colorScheme.onPrimary
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -162,7 +199,9 @@ class _SidebarTile extends StatelessWidget {
                 Text(
                   item.label,
                   style: TextStyle(
-                    color: colorScheme.onPrimary.withOpacity(selected ? 1 : 0.85),
+                    color: colorScheme.onPrimary.withOpacity(
+                      selected ? 1 : 0.85,
+                    ),
                     fontSize: 14.5,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   ),
@@ -195,7 +234,11 @@ class _LogoutTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.logout_rounded, color: colorScheme.onPrimary.withOpacity(0.85), size: 20),
+                Icon(
+                  Icons.logout_rounded,
+                  color: colorScheme.onPrimary.withOpacity(0.85),
+                  size: 20,
+                ),
                 const SizedBox(width: 14),
                 Text(
                   'Logout',

@@ -5,13 +5,20 @@ import '../app_settings.dart';
 class CompanySettingsService {
   CompanySettingsService._();
 
-  static final CompanySettingsService instance =
-  CompanySettingsService._();
+  static final CompanySettingsService instance = CompanySettingsService._();
 
   static const String _collection = 'app_settings';
   static const String _document = 'general';
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  late final Stream<AppSettings> _settingsStream = _documentReference
+      .snapshots()
+      .map((snapshot) {
+        final data = snapshot.data();
+        return data == null ? const AppSettings() : AppSettings.fromMap(data);
+      })
+      .asBroadcastStream();
 
   DocumentReference<Map<String, dynamic>> get _documentReference {
     return _firestore.collection(_collection).doc(_document);
@@ -25,6 +32,10 @@ class CompanySettingsService {
     }
 
     return AppSettings.fromMap(snapshot.data()!);
+  }
+
+  Stream<AppSettings> watchSettings() {
+    return _settingsStream;
   }
 
   Future<void> updateSettings({
@@ -41,31 +52,18 @@ class CompanySettingsService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    await _documentReference.set(
-      data,
-      SetOptions(merge: true),
-    );
+    await _documentReference.set(data, SetOptions(merge: true));
   }
 
   Future<void> updateAppName(String appName) async {
-    await updateSettings(
-      appName: appName,
-    );
+    await updateSettings(appName: appName);
   }
 
   Future<void> updateLogoUrl(String logoUrl) async {
-    await updateSettings(
-      logoUrl: logoUrl,
-    );
+    await updateSettings(logoUrl: logoUrl);
   }
 
-  Future<void> updateContactInfo({
-    String? email,
-    String? phone,
-  }) async {
-    await updateSettings(
-      email: email,
-      phone: phone,
-    );
+  Future<void> updateContactInfo({String? email, String? phone}) async {
+    await updateSettings(email: email, phone: phone);
   }
 }

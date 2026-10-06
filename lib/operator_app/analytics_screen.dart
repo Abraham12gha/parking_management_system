@@ -61,9 +61,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ? (widget.locationIdOverride == 'ALL' ? 'ALL' : _cache.locationId)
         : _selectedLocationId;
 
-    final data = await _cache.getTickets(
-      specificLocationId: locId,
-    );
+    final data = await _cache.getTickets(specificLocationId: locId);
 
     if (mounted) {
       setState(() {
@@ -80,7 +78,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   DateTimeRange? _getTimeframeRange() {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = todayStart.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+    final todayEnd = todayStart
+        .add(const Duration(days: 1))
+        .subtract(const Duration(milliseconds: 1));
 
     switch (_timeframe) {
       case AnalyticsTimeframe.today:
@@ -108,18 +108,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return _tickets.where((ticket) {
       final isInside = ticket.status.toLowerCase() == 'in';
-      final operatorId = _cache.userRole == 'operator' &&
-              widget.locationIdOverride == null
+      final operatorId =
+          _cache.userRole == 'operator' && widget.locationIdOverride == null
           ? _cache.operatorId
           : null;
       final attributedOperator = isInside
           ? ticket.entryOperatorId
           : (ticket.exitOperatorId.isNotEmpty
-              ? ticket.exitOperatorId
-              : ticket.operatorId);
+                ? ticket.exitOperatorId
+                : ticket.operatorId);
       if (operatorId != null && attributedOperator != operatorId) return false;
       if (range == null) return true;
-      final t = (isInside ? ticket.startTime : ticket.endTime)?.toDate() ??
+      final t =
+          (isInside ? ticket.startTime : ticket.endTime)?.toDate() ??
           ticket.startTime?.toDate();
       if (t == null) return false;
       return !t.isBefore(range.start) && !t.isAfter(range.end);
@@ -148,7 +149,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   double get _avgRevenuePerTicket {
-    final exited = _filteredTickets.where((t) => t.status.toLowerCase() != 'in').length;
+    final exited = _filteredTickets
+        .where((t) => t.status.toLowerCase() != 'in')
+        .length;
     if (exited == 0) return 0;
     return _totalRevenue / exited;
   }
@@ -213,9 +216,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // Category counts & revenue
   Map<String, _CategoryStats> get _categoryStats {
     final stats = {
-      'valet': _CategoryStats('Valet Parking', Icons.room_service_rounded, const Color(0xFF512DA8)),
-      'self': _CategoryStats('Self Parking', Icons.directions_car_rounded, const Color(0xFF2E7D32)),
-      'bike': _CategoryStats('Bike / Motorcycle', Icons.two_wheeler_rounded, const Color(0xFF00838F)),
+      'valet': _CategoryStats(
+        'Valet Parking',
+        Icons.room_service_rounded,
+        const Color(0xFF512DA8),
+      ),
+      'self': _CategoryStats(
+        'Self Parking',
+        Icons.directions_car_rounded,
+        const Color(0xFF2E7D32),
+      ),
+      'bike': _CategoryStats(
+        'Bike / Motorcycle',
+        Icons.two_wheeler_rounded,
+        const Color(0xFF00838F),
+      ),
     };
 
     for (final t in _filteredTickets) {
@@ -272,7 +287,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final locationName = widget.locationNameOverride ?? _cache.locationName ?? 'Current Facility';
+    final locationName =
+        widget.locationNameOverride ??
+        _cache.locationName ??
+        'Current Facility';
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -289,7 +307,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     onRefresh: _loadData,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -328,9 +349,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildHeader(ThemeData theme, String locationName) {
     final colorScheme = theme.colorScheme;
+    final timeframeButtons = [
+      _timeframeButton('Today', AnalyticsTimeframe.today, colorScheme),
+      _timeframeButton(
+        'Last 7 Days',
+        AnalyticsTimeframe.last7Days,
+        colorScheme,
+      ),
+      _timeframeButton(
+        'Last 30 Days',
+        AnalyticsTimeframe.last30Days,
+        colorScheme,
+      ),
+      _timeframeButton('This Month', AnalyticsTimeframe.thisMonth, colorScheme),
+      _timeframeButton('All Time', AnalyticsTimeframe.allTime, colorScheme),
+    ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(
@@ -339,117 +375,137 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.bar_chart_rounded, color: colorScheme.primary, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                'Performance & Parking Analytics',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: colorScheme.onSurface,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.bar_chart_rounded,
+                  color: colorScheme.primary,
+                  size: 24,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Location: $locationName • Real-Time Metrics & Traffic Insights',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          if (widget.locationIdOverride == 'ALL' && _availableLocations.isNotEmpty) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.15)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedLocationId,
-                  icon: const Icon(Icons.arrow_drop_down),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
-                  ),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() => _selectedLocationId = val);
-                      _loadData();
-                    }
-                  },
-                  items: [
-                    const DropdownMenuItem(
-                      value: 'ALL',
-                      child: Text('All Facilities (System-Wide)'),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Performance & Parking Analytics',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                    ..._availableLocations.map(
-                      (loc) => DropdownMenuItem(
-                        value: loc.id,
-                        child: Text(loc.locationName),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Location: $locationName • Real-Time Metrics & Traffic Insights',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (widget.locationIdOverride == 'ALL' &&
+              _availableLocations.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: DropdownButtonFormField<String>(
+                initialValue: _selectedLocationId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedLocationId = val);
+                    _loadData();
+                  }
+                },
+                items: [
+                  const DropdownMenuItem(
+                    value: 'ALL',
+                    child: Text(
+                      'All Facilities (System-Wide)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  ..._availableLocations.map(
+                    (loc) => DropdownMenuItem(
+                      value: loc.id,
+                      child: Text(
+                        loc.locationName,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 12),
-          ],
-          // Timeframe selector
+          if (widget.locationIdOverride == 'ALL' &&
+              _availableLocations.isNotEmpty)
+            const SizedBox(height: 10),
           Container(
+            width: double.infinity,
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.35,
+              ),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.15)),
+              border: Border.all(
+                color: colorScheme.outline.withValues(alpha: 0.15),
+              ),
             ),
             padding: const EdgeInsets.all(3),
-            child: Row(
-              children: [
-                _timeframeButton('Today', AnalyticsTimeframe.today, colorScheme),
-                _timeframeButton('Last 7 Days', AnalyticsTimeframe.last7Days, colorScheme),
-                _timeframeButton('Last 30 Days', AnalyticsTimeframe.last30Days, colorScheme),
-                _timeframeButton('This Month', AnalyticsTimeframe.thisMonth, colorScheme),
-                _timeframeButton('All Time', AnalyticsTimeframe.allTime, colorScheme),
-              ],
-            ),
+            child: Wrap(spacing: 2, runSpacing: 2, children: timeframeButtons),
           ),
-          const SizedBox(width: 12),
-          IconButton(
-            tooltip: 'Refresh Analytics',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadData,
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              tooltip: 'Refresh Analytics',
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _loadData,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _timeframeButton(String label, AnalyticsTimeframe tf, ColorScheme colors) {
+  Widget _timeframeButton(
+    String label,
+    AnalyticsTimeframe tf,
+    ColorScheme colors,
+  ) {
     final selected = _timeframe == tf;
     return InkWell(
       onTap: () => setState(() => _timeframe = tf),
       borderRadius: BorderRadius.circular(6),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: selected ? colors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
@@ -459,7 +515,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            color: selected ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.75),
+            color: selected
+                ? colors.onPrimary
+                : colors.onSurface.withValues(alpha: 0.75),
           ),
         ),
       ),
@@ -482,14 +540,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           _AnalyticsKpiCard(
             title: 'TOTAL REVENUE',
             value: 'Rs. ${NumberFormat('#,##0').format(_totalRevenue)}',
-            subtitle: 'Avg Rs. ${_avgRevenuePerTicket.toStringAsFixed(0)} / car',
+            subtitle:
+                'Avg Rs. ${_avgRevenuePerTicket.toStringAsFixed(0)} / car',
             icon: Icons.payments_rounded,
             color: const Color(0xFF2E7D32),
           ),
           _AnalyticsKpiCard(
             title: 'TOTAL VEHICLES',
             value: '$_totalVehicles',
-            subtitle: '${_filteredTickets.length - _activeCount} Exited (${_totalVehicles > 0 ? ((_filteredTickets.length - _activeCount) * 100 ~/ _totalVehicles) : 0}%)',
+            subtitle:
+                '${_filteredTickets.length - _activeCount} Exited (${_totalVehicles > 0 ? ((_filteredTickets.length - _activeCount) * 100 ~/ _totalVehicles) : 0}%)',
             icon: Icons.directions_car_rounded,
             color: const Color(0xFF1E88E5),
           ),
@@ -519,7 +579,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
-          children: cards.map((c) => SizedBox(width: cardWidth, child: c)).toList(),
+          children: cards
+              .map((c) => SizedBox(width: cardWidth, child: c))
+              .toList(),
         );
       },
     );
@@ -568,7 +630,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final daysMap = <String, _DayStat>{};
     final now = DateTime.now();
 
-    final daysCount = _timeframe == AnalyticsTimeframe.today ? 1 : (_timeframe == AnalyticsTimeframe.last7Days ? 7 : 14);
+    final daysCount = _timeframe == AnalyticsTimeframe.today
+        ? 1
+        : (_timeframe == AnalyticsTimeframe.last7Days ? 7 : 14);
 
     for (int i = daysCount - 1; i >= 0; i--) {
       final d = now.subtract(Duration(days: i));
@@ -584,7 +648,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       if (daysMap.containsKey(key)) {
         daysMap[key]!.count++;
         if (t.status.toLowerCase() != 'in') {
-          daysMap[key]!.revenue += (t.charges > 0 ? t.charges : t.parkingCharges);
+          daysMap[key]!.revenue += (t.charges > 0
+              ? t.charges
+              : t.parkingCharges);
         }
       }
     }
@@ -611,7 +677,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.trending_up_rounded, color: colorScheme.primary, size: 22),
+              Icon(
+                Icons.trending_up_rounded,
+                color: colorScheme.primary,
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Vehicle Volume & Revenue Trend',
@@ -630,7 +700,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 8),
           Text(
             'Daily check-ins and revenue collection across period',
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.55)),
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
           ),
           const SizedBox(height: 24),
 
@@ -645,7 +718,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                 return Expanded(
                   child: Tooltip(
-                    message: '${day.label}\nVehicles: ${day.count}\nRevenue: Rs. ${NumberFormat('#,##0').format(day.revenue)}',
+                    message:
+                        '${day.label}\nVehicles: ${day.count}\nRevenue: Rs. ${NumberFormat('#,##0').format(day.revenue)}',
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -663,7 +737,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           height: barHeight,
                           decoration: BoxDecoration(
                             color: colorScheme.primary,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(6),
+                            ),
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
@@ -731,7 +807,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.schedule_rounded, color: Colors.orange.shade800, size: 22),
+              Icon(
+                Icons.schedule_rounded,
+                color: Colors.orange.shade800,
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Hourly Inflow Intensity',
@@ -746,7 +826,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 8),
           Text(
             'Vehicle entry count by hour of day (rush hours)',
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.55)),
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -779,9 +862,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final ratio = count / maxCount;
     final isPeak = ratio >= 0.7 && count > 0;
 
-    final startLabel = hour > 12 ? '${hour - 12} PM' : (hour == 12 ? '12 PM' : '$hour AM');
+    final startLabel = hour > 12
+        ? '${hour - 12} PM'
+        : (hour == 12 ? '12 PM' : '$hour AM');
     final endHour = hour + 2;
-    final endLabel = endHour > 12 ? '${endHour - 12} PM' : (endHour == 12 ? '12 PM' : '$endHour AM');
+    final endLabel = endHour > 12
+        ? '${endHour - 12} PM'
+        : (endHour == 12 ? '12 PM' : '$endHour AM');
 
     return Row(
       children: [
@@ -792,7 +879,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: isPeak ? Colors.orange.shade900 : colorScheme.onSurface.withValues(alpha: 0.7),
+              color: isPeak
+                  ? Colors.orange.shade900
+                  : colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -804,13 +893,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               children: [
                 Container(
                   height: 14,
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.4,
+                  ),
                 ),
                 FractionallySizedBox(
                   widthFactor: max(0.02, ratio.clamp(0.0, 1.0)),
                   child: Container(
                     height: 14,
-                    color: isPeak ? Colors.orange.shade700 : colorScheme.primary,
+                    color: isPeak
+                        ? Colors.orange.shade700
+                        : colorScheme.primary,
                   ),
                 ),
               ],
@@ -858,11 +951,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           );
         } else {
           return Column(
-            children: [
-              categoryCard,
-              const SizedBox(height: 20),
-              durationCard,
-            ],
+            children: [categoryCard, const SizedBox(height: 20), durationCard],
           );
         }
       },
@@ -893,7 +982,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.pie_chart_rounded, color: const Color(0xFF512DA8), size: 22),
+              Icon(
+                Icons.pie_chart_rounded,
+                color: const Color(0xFF512DA8),
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Vehicle Category Distribution',
@@ -908,7 +1001,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 8),
           Text(
             'Volume and revenue breakdown by category',
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.55)),
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
           ),
           const SizedBox(height: 18),
 
@@ -934,7 +1030,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
           // Detail Tiles
           ...catStats.values.map((cat) {
-            final pct = total > 0 ? (cat.count * 100 / total).toStringAsFixed(1) : '0';
+            final pct = total > 0
+                ? (cat.count * 100 / total).toStringAsFixed(1)
+                : '0';
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
@@ -951,10 +1049,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(cat.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      Text(
+                        cat.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
                       Text(
                         'Rs. ${NumberFormat('#,##0').format(cat.revenue)} collected',
-                        style: TextStyle(fontSize: 11.5, color: colorScheme.onSurface.withValues(alpha: 0.55)),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: colorScheme.onSurface.withValues(alpha: 0.55),
+                        ),
                       ),
                     ],
                   ),
@@ -962,8 +1069,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('${cat.count} vehicles', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                      Text('$pct%', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: cat.color)),
+                      Text(
+                        '${cat.count} vehicles',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        '$pct%',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: cat.color,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -999,7 +1119,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.timer_rounded, color: const Color(0xFF00838F), size: 22),
+              Icon(
+                Icons.timer_rounded,
+                color: const Color(0xFF00838F),
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Duration of Stay Breakdown',
@@ -1014,7 +1138,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 8),
           Text(
             'Vehicle turnaround time and parking duration patterns',
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.55)),
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -1036,7 +1163,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700,
-                          color: isOverstay ? Colors.red.shade700 : colorScheme.onSurface,
+                          color: isOverstay
+                              ? Colors.red.shade700
+                              : colorScheme.onSurface,
                         ),
                       ),
                       Text(
@@ -1056,13 +1185,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       children: [
                         Container(
                           height: 10,
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.35,
+                          ),
                         ),
                         FractionallySizedBox(
                           widthFactor: max(0.01, pct.clamp(0.0, 1.0)),
                           child: Container(
                             height: 10,
-                            color: isOverstay ? Colors.red : const Color(0xFF00838F),
+                            color: isOverstay
+                                ? Colors.red
+                                : const Color(0xFF00838F),
                           ),
                         ),
                       ],
@@ -1085,7 +1218,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final colorScheme = theme.colorScheme;
     final now = DateTime.now();
 
-    final activeList = _tickets.where((t) => t.status.toLowerCase() == 'in').toList();
+    final activeList = _tickets
+        .where((t) => t.status.toLowerCase() == 'in')
+        .toList();
     activeList.sort((a, b) {
       final aStart = a.startTime?.toDate() ?? now;
       final bStart = b.startTime?.toDate() ?? now;
@@ -1114,7 +1249,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 22),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange.shade800,
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Longest Parked Vehicles (Active Watchlist)',
@@ -1127,14 +1266,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               const Spacer(),
               Text(
                 '${activeList.length} active vehicles currently inside',
-                style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             'Vehicles currently inside that have accumulated the highest elapsed parking time',
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.55)),
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -1144,7 +1289,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: Center(
                 child: Text(
                   'No vehicles currently parked inside.',
-                  style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5)),
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             )
@@ -1188,51 +1335,91 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                       child: Text(
                         '#${index + 1}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        color: colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.5,
+                        ),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: colorScheme.outline.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Text(
                         ticket.vehicleNumber,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.6),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          letterSpacing: 0.6,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 14),
                     Text(
                       ticket.ticketNumber,
-                      style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: colorScheme.primary),
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Text(
-                      ticket.driverName.isNotEmpty ? ticket.driverName : 'Walk-in Driver',
-                      style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.7)),
+                      ticket.driverName.isNotEmpty
+                          ? ticket.driverName
+                          : 'Walk-in Driver',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: isVeryLong ? Colors.red.shade50 : Colors.orange.shade50,
+                        color: isVeryLong
+                            ? Colors.red.shade50
+                            : Colors.orange.shade50,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: isVeryLong ? Colors.red.shade200 : Colors.orange.shade200),
+                        border: Border.all(
+                          color: isVeryLong
+                              ? Colors.red.shade200
+                              : Colors.orange.shade200,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.timer_outlined, size: 14, color: isVeryLong ? Colors.red.shade800 : Colors.orange.shade900),
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 14,
+                            color: isVeryLong
+                                ? Colors.red.shade800
+                                : Colors.orange.shade900,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             elapsed,
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w800,
-                              color: isVeryLong ? Colors.red.shade900 : Colors.orange.shade900,
+                              color: isVeryLong
+                                  ? Colors.red.shade900
+                                  : Colors.orange.shade900,
                             ),
                           ),
                         ],
@@ -1251,9 +1438,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }
