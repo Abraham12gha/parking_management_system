@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../app_settings.dart';
+import '../resources/widget/company_logo.dart';
+import 'company_settings_service.dart';
+
 class AdminTitleBar extends StatefulWidget {
   const AdminTitleBar({super.key});
 
@@ -9,213 +13,216 @@ class AdminTitleBar extends StatefulWidget {
 }
 
 class _AdminTitleBarState extends State<AdminTitleBar> {
-  bool isMaximized = false;
+  bool _isMaximized = false;
 
   @override
   void initState() {
     super.initState();
-
-    _checkMaximized();
+    _readWindowState();
   }
 
-  Future<void> _checkMaximized() async {
+  Future<void> _readWindowState() async {
     final maximized = await windowManager.isMaximized();
-
-    if (mounted) {
-      setState(() {
-        isMaximized = maximized;
-      });
-    }
+    if (mounted) setState(() => _isMaximized = maximized);
   }
 
   Future<void> _toggleMaximize() async {
-    if (await windowManager.isMaximized()) {
+    final maximized = await windowManager.isMaximized();
+    if (maximized) {
       await windowManager.unmaximize();
-
-      setState(() {
-        isMaximized = false;
-      });
     } else {
       await windowManager.maximize();
-
-      setState(() {
-        isMaximized = true;
-      });
     }
+    if (mounted) setState(() => _isMaximized = !maximized);
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 50,
-      child: Row(
-        children: [
-          // =========================================================
-          // APP BRAND
-          // =========================================================
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
 
-          Container(
-            width: 250,
-            height: 50,
-            color: const Color(0xFF111827),
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB),
-                    borderRadius: BorderRadius.circular(7),
-                  ),
-                  child: const Icon(
-                    Icons.local_parking_rounded,
-                    color: Colors.white,
-                    size: 17,
-                  ),
-                ),
-
-                const SizedBox(width: 10),
-
-                const Text(
-                  'PARKING MANAGEMENT',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
+    return Material(
+      color: colors.surface,
+      child: Container(
+        height: 54,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: colors.outlineVariant.withValues(alpha: 0.55),
             ),
           ),
-
-          // =========================================================
-          // DRAGGABLE AREA
-          // =========================================================
-
-          Expanded(
-            child: DragToMoveArea(
-              child: Container(
-                height: 50,
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Row(
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 258,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
                   children: [
-                    Text(
-                      'Admin Panel',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 13,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: CompanyLogo(
+                        size: 28,
+                        fallbackColor: colors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: StreamBuilder<AppSettings>(
+                        stream: CompanySettingsService.instance.watchSettings(),
+                        builder: (context, snapshot) {
+                          final configuredName = snapshot.data?.appName.trim();
+                          final title =
+                              configuredName == null ||
+                                  configuredName.isEmpty ||
+                                  configuredName == 'My Admin App'
+                              ? 'Parking Management'
+                              : configuredName;
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                              Text(
+                                'PARKING OPERATIONS',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                  fontSize: 9,
+                                  letterSpacing: 1.05,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-
-          // =========================================================
-          // MINIMIZE
-          // =========================================================
-
-          _WindowButton(
-            icon: Icons.remove,
-            onPressed: () {
-              windowManager.minimize();
-            },
-          ),
-
-          // =========================================================
-          // MAXIMIZE
-          // =========================================================
-
-          _WindowButton(
-            icon: isMaximized
-                ? Icons.filter_none_rounded
-                : Icons.crop_square_rounded,
-            onPressed: _toggleMaximize,
-          ),
-
-          // =========================================================
-          // CLOSE
-          // =========================================================
-
-          _WindowButton(
-            icon: Icons.close,
-            isClose: true,
-            onPressed: () {
-              windowManager.close();
-            },
-          ),
-        ],
+            Expanded(
+              child: DragToMoveArea(
+                child: Container(
+                  height: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Text(
+                        'Workspace',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            _WindowButton(
+              label: 'Minimize',
+              icon: Icons.remove_rounded,
+              onPressed: windowManager.minimize,
+            ),
+            _WindowButton(
+              label: _isMaximized ? 'Restore' : 'Maximize',
+              icon: _isMaximized
+                  ? Icons.filter_none_rounded
+                  : Icons.crop_square_rounded,
+              onPressed: _toggleMaximize,
+            ),
+            _WindowButton(
+              label: 'Close',
+              icon: Icons.close_rounded,
+              isClose: true,
+              onPressed: windowManager.close,
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-
-// =============================================================
-// WINDOW BUTTON
-// =============================================================
-
 class _WindowButton extends StatefulWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-  final bool isClose;
-
   const _WindowButton({
+    required this.label,
     required this.icon,
     required this.onPressed,
     this.isClose = false,
   });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool isClose;
 
   @override
   State<_WindowButton> createState() => _WindowButtonState();
 }
 
 class _WindowButtonState extends State<_WindowButton> {
-  bool hovering = false;
+  bool _hovering = false;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hoverColor = widget.isClose
+        ? const Color(0xFFE5484D)
+        : colors.surfaceContainerHighest;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-
-      onEnter: (_) {
-        setState(() {
-          hovering = true;
-        });
-      },
-
-      onExit: (_) {
-        setState(() {
-          hovering = false;
-        });
-      },
-
-      child: GestureDetector(
-        onTap: widget.onPressed,
-
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-
-          width: 46,
-          height: 50,
-
-          color: hovering
-              ? widget.isClose
-              ? const Color(0xFFDC2626)
-              : const Color(0xFFE5E7EB)
-              : Colors.transparent,
-
-          child: Icon(
-            widget.icon,
-            size: 17,
-
-            color: hovering && widget.isClose
-                ? Colors.white
-                : const Color(0xFF374151),
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: Semantics(
+        button: true,
+        label: widget.label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            width: 46,
+            height: 53,
+            color: _hovering ? hoverColor : Colors.transparent,
+            alignment: Alignment.center,
+            child: Icon(
+              widget.icon,
+              size: 17,
+              color: _hovering && widget.isClose
+                  ? Colors.white
+                  : colors.onSurfaceVariant,
+            ),
           ),
         ),
       ),

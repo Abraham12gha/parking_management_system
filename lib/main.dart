@@ -1,12 +1,13 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/auth_wrapper.dart';
 import 'package:parking_management_system/resources/app_theme.dart';
 import 'package:parking_management_system/resources/widget/internet_connection_banner.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:parking_management_system/services/auth.dart';
 import 'package:parking_management_system/theme_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:window_manager/window_manager.dart';
+import 'services/app_title_bar.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -18,6 +19,27 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
+
+  final isDesktop =
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.linux);
+  if (isDesktop) {
+    await windowManager.ensureInitialized();
+    const windowOptions = WindowOptions(
+      size: Size(1440, 900),
+      minimumSize: Size(880, 600),
+      center: true,
+      title: 'Parking Management',
+      titleBarStyle: TitleBarStyle.hidden,
+      backgroundColor: Color(0xFFF5F8F5),
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
 
   // final auth = Auth();
   // await auth.logoutOnAppStart();
@@ -45,9 +67,34 @@ class _MyAppState extends State<MyApp> {
           themeMode: mode,
           themeAnimationDuration: const Duration(milliseconds: 350),
           themeAnimationCurve: Curves.easeInOutCubic,
-          home: const InternetConnectionBanner(child: AuthWrapper()),
+          home: const _AppWindowShell(
+            child: InternetConnectionBanner(child: AuthWrapper()),
+          ),
         );
       },
+    );
+  }
+}
+
+class _AppWindowShell extends StatelessWidget {
+  const _AppWindowShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.linux);
+    if (!isDesktop) return child;
+
+    return Column(
+      children: [
+        const AdminTitleBar(),
+        Expanded(child: child),
+      ],
     );
   }
 }
