@@ -2151,10 +2151,13 @@ class _CaroutScreenState extends State<CaroutScreen> {
       double parkingCharge,
       int graceTimeSeconds,
       ) {
+    final liveGrace = AppDataCache.instance.graceTimeSeconds;
+    final effectiveGrace = graceTimeSeconds > 0 ? graceTimeSeconds : liveGrace;
+
     return _calculateParkingChargeAtTime(
       startTime,
       parkingCharge,
-      graceTimeSeconds,
+      effectiveGrace,
       DateTime.now(),
     );
   }

@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../app_model/parking_ticket_model.dart';
 
-/// Central high-performance cache and pre-warming service.
-/// Eliminates redundant Firestore reads and eliminates loading spinners during working hours.
+/// Central high-performance cache and real-time synchronization service.
+/// Eliminates redundant Firestore reads and ensures instant propagation of
+/// admin updates (such as grace time and charges) to all active operators.
 class AppDataCache {
   AppDataCache._();
   static final AppDataCache instance = AppDataCache._();
@@ -27,10 +29,15 @@ class AppDataCache {
   bool _isLoading = false;
 
   final ValueNotifier<bool> isReadyNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<int> graceTimeNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<int> parkingChargesNotifier = ValueNotifier<int>(0);
 
   // Cached Tickets
   List<ParkingTicketModel> _cachedActiveTickets = [];
+  final Set<String> _activePlatesSet = <String>{};
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _activeTicketsSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _locationSub;
+
   final ValueNotifier<List<ParkingTicketModel>> activeTicketsNotifier =
       ValueNotifier<List<ParkingTicketModel>>([]);
 
@@ -48,8 +55,15 @@ class AppDataCache {
 
   List<ParkingTicketModel> get cachedActiveTickets => _cachedActiveTickets;
 
+  /// Fast in-memory duplicate plate check for high-traffic entry barriers.
+  bool isVehicleAlreadyIn(String vehicleNumber) {
+    final clean = vehicleNumber.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+    return _activePlatesSet.contains(clean);
+  }
+
   /// Pre-warms operator profile, location settings, and active tickets stream.
-  /// Call this on app startup or immediately when dashboard mounts.
+  /// Subscribes to real-time location changes so admin grace time changes
+  /// immediately reflect across all active operators without reloading.
   Future<void> preloadForCurrentUser({bool force = false}) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -57,7 +71,7 @@ class AppDataCache {
       return;
     }
 
-    // If a different operator logged in, clear all stale data first
+    // If a different user logged in, clear stale data first
     if (_operatorId != null && _operatorId != user.uid) {
       clear();
     }
@@ -85,28 +99,8 @@ class AppDataCache {
       if (locId != null && locId.isNotEmpty) {
         _locationId = locId;
 
-        // 2. Fetch location doc
-        final locDoc =
-            await _firestore.collection('locations').doc(locId).get();
-        if (locDoc.exists) {
-          final locData = locDoc.data() ?? {};
-          _locationName = locData['locationName']?.toString() ?? '';
-
-          final dynamic numId = locData['id'];
-          _locationNumericId = numId is int
-              ? numId
-              : int.tryParse(numId?.toString() ?? '') ?? 0;
-
-          final dynamic charges = locData['parkingCharges'];
-          _parkingCharges = charges is num
-              ? charges.toInt()
-              : int.tryParse(charges?.toString() ?? '') ?? 0;
-
-          final dynamic grace = locData['graceTimeSeconds'];
-          _graceTimeSeconds = grace is num
-              ? grace.toInt()
-              : int.tryParse(grace?.toString() ?? '') ?? 0;
-        }
+        // 2. Fetch & attach real-time listener to location doc
+        await _attachLocationListener(locId);
 
         // 3. Pre-warm active tickets stream
         _listenToActiveTickets(locId);
@@ -119,6 +113,77 @@ class AppDataCache {
     } finally {
       _isLoading = false;
     }
+  }
+
+  /// Attaches a real-time listener to the location document.
+  /// When admin updates grace time or charges, all operators receive it instantly.
+  Future<void> _attachLocationListener(String locId) async {
+    _locationSub?.cancel();
+
+    // Initial read
+    try {
+      final locDoc = await _firestore.collection('locations').doc(locId).get();
+      if (locDoc.exists) {
+        _applyLocationData(locDoc.data() ?? {});
+      }
+    } catch (e) {
+      debugPrint('Initial location fetch error: $e');
+    }
+
+    // Real-time updates subscription
+    _locationSub = _firestore
+        .collection('locations')
+        .doc(locId)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (!snapshot.exists) return;
+        final data = snapshot.data() ?? {};
+        _applyLocationData(data);
+      },
+      onError: (err) {
+        debugPrint('Location settings stream error: $err');
+      },
+    );
+  }
+
+  void _applyLocationData(Map<String, dynamic> locData) {
+    _locationName = locData['locationName']?.toString() ?? _locationName ?? '';
+
+    final dynamic numId = locData['id'];
+    _locationNumericId = numId is int
+        ? numId
+        : int.tryParse(numId?.toString() ?? '') ?? 0;
+
+    final dynamic charges = locData['parkingCharges'];
+    final newCharges = charges is num
+        ? charges.toInt()
+        : int.tryParse(charges?.toString() ?? '') ?? 0;
+
+    final dynamic grace = locData['graceTimeSeconds'];
+    final newGrace = grace is num
+        ? grace.toInt()
+        : int.tryParse(grace?.toString() ?? '') ?? 0;
+
+    final bool chargesChanged = _parkingCharges != newCharges;
+    final bool graceChanged = _graceTimeSeconds != newGrace;
+
+    _parkingCharges = newCharges;
+    _graceTimeSeconds = newGrace;
+
+    if (chargesChanged) parkingChargesNotifier.value = newCharges;
+    if (graceChanged) graceTimeNotifier.value = newGrace;
+
+    // Cache into local preferences asynchronously so offline mode is consistent
+    _persistPreferences(newCharges, newGrace);
+  }
+
+  Future<void> _persistPreferences(int charges, int grace) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('parking_charges', charges);
+      await prefs.setInt('grace_time_seconds', grace);
+    } catch (_) {}
   }
 
   void _listenToActiveTickets(String locId) {
@@ -134,6 +199,16 @@ class AppDataCache {
             .map((doc) => ParkingTicketModel.fromFirestore(doc))
             .toList();
         _cachedActiveTickets = list;
+
+        // Update in-memory plate index for instantaneous duplicate checks
+        _activePlatesSet.clear();
+        for (final ticket in list) {
+          final clean = ticket.vehicleNumber.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+          if (clean.isNotEmpty) {
+            _activePlatesSet.add(clean);
+          }
+        }
+
         activeTicketsNotifier.value = list;
       },
       onError: (err) {
@@ -142,7 +217,24 @@ class AppDataCache {
     );
   }
 
-  /// Stream of all tickets for the assigned location (for real-time dashboard stats & updates)
+  /// System-wide active tickets stream (used by Admin Dashboard)
+  Stream<List<ParkingTicketModel>> systemWideActiveTicketsStream({String? locationId}) {
+    Query<Map<String, dynamic>> query = _firestore
+        .collection('parking_tickets')
+        .where('status', isEqualTo: 'in');
+
+    if (locationId != null && locationId.isNotEmpty && locationId != 'ALL') {
+      query = query.where('locationId', isEqualTo: locationId);
+    }
+
+    return query.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => ParkingTicketModel.fromFirestore(doc))
+          .toList(),
+    );
+  }
+
+  /// Stream of all tickets for the assigned location
   Stream<List<ParkingTicketModel>> ticketsStream({String? specificLocationId}) {
     final locId = specificLocationId ?? _locationId;
     if (locId == null || locId.isEmpty) {
@@ -183,24 +275,22 @@ class AppDataCache {
       final activeSnapshot = await query.get(
         const GetOptions(source: Source.serverAndCache),
       );
-      // Older checkouts were moved to `backup`. Some deployments permit
-      // writes there but deny reads, so an archive denial must not discard
-      // readable active/history tickets from parking_tickets.
+
       QuerySnapshot<Map<String, dynamic>>? completedSnapshot;
       try {
-          Query<Map<String, dynamic>> completedQuery =
-              _firestore.collection('backup');
-          if (locId != null && locId.isNotEmpty && locId != 'ALL') {
-            completedQuery = completedQuery.where('locationId', isEqualTo: locId);
-          }
-          if (limit != null && limit > 0) completedQuery = completedQuery.limit(limit);
-          completedSnapshot = await completedQuery.get(
-            const GetOptions(source: Source.serverAndCache),
-          );
-      } catch (error) {
-          // Legacy archive access is optional; primary ticket history remains
-          // usable when rules deny reads from `backup`.
+        Query<Map<String, dynamic>> completedQuery =
+            _firestore.collection('backup');
+        if (locId != null && locId.isNotEmpty && locId != 'ALL') {
+          completedQuery = completedQuery.where('locationId', isEqualTo: locId);
+        }
+        if (limit != null && limit > 0) completedQuery = completedQuery.limit(limit);
+        completedSnapshot = await completedQuery.get(
+          const GetOptions(source: Source.serverAndCache),
+        );
+      } catch (_) {
+        // Optional archive access
       }
+
       var list = [
         ...activeSnapshot.docs,
         ...?completedSnapshot?.docs,
@@ -208,7 +298,7 @@ class AppDataCache {
           .map((doc) => ParkingTicketModel.fromFirestore(doc))
           .toList();
 
-      // Local date filtering for precision and avoiding complex composite index requirement
+      // Precision date filtering
       if (startDate != null) {
         list = list.where((t) {
           final time = (t.status.toLowerCase() == 'in' ? t.startTime : t.endTime)?.toDate() ?? t.startTime?.toDate();
@@ -251,9 +341,14 @@ class AppDataCache {
     _isLoaded = false;
     _isLoading = false;
     _cachedActiveTickets.clear();
+    _activePlatesSet.clear();
     _activeTicketsSub?.cancel();
     _activeTicketsSub = null;
+    _locationSub?.cancel();
+    _locationSub = null;
     isReadyNotifier.value = false;
+    graceTimeNotifier.value = 0;
+    parkingChargesNotifier.value = 0;
     activeTicketsNotifier.value = [];
   }
 }

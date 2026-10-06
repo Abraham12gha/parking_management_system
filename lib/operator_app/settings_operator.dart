@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/app_data_cache.dart';
 import '../theme_controller.dart';
 
 class SettingScreenOperator extends StatefulWidget {
@@ -346,9 +347,27 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
     super.initState();
     _loadCachedParkingCharges();
     _loadCachedOperatorInfo();
+
+    // Attach real-time listeners for instant admin updates
+    AppDataCache.instance.graceTimeNotifier.addListener(_onRealtimeGraceTimeChanged);
+    AppDataCache.instance.parkingChargesNotifier.addListener(_onRealtimeChargesChanged);
   }
 
+  void _onRealtimeGraceTimeChanged() {
+    if (!mounted) return;
+    final newGrace = AppDataCache.instance.graceTimeNotifier.value;
+    setState(() {
+      _graceTimeSeconds = newGrace;
+    });
+  }
 
+  void _onRealtimeChargesChanged() {
+    if (!mounted) return;
+    final newCharges = AppDataCache.instance.parkingChargesNotifier.value;
+    setState(() {
+      _parkingCharges = newCharges;
+    });
+  }
 
   // ============================================================
   // DISPOSE
@@ -356,6 +375,9 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
   @override
   void dispose() {
+    AppDataCache.instance.graceTimeNotifier.removeListener(_onRealtimeGraceTimeChanged);
+    AppDataCache.instance.parkingChargesNotifier.removeListener(_onRealtimeChargesChanged);
+
     _appNameController.dispose();
     _apiKeyController.dispose();
     _merchantIdController.dispose();

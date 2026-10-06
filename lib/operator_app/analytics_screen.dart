@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../app_model/location_model.dart';
 import '../app_model/parking_ticket_model.dart';
 import '../services/app_data_cache.dart';
+import '../services/location_service.dart';
 
 enum AnalyticsTimeframe { today, last7Days, last30Days, thisMonth, allTime }
 
@@ -22,7 +24,11 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final AppDataCache _cache = AppDataCache.instance;
+  final LocationService _locationService = LocationService();
   AnalyticsTimeframe _timeframe = AnalyticsTimeframe.last7Days;
+
+  String _selectedLocationId = 'ALL';
+  List<LocationModel> _availableLocations = [];
 
   List<ParkingTicketModel> _tickets = [];
   bool _isLoading = false;
@@ -30,7 +36,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedLocationId = widget.locationIdOverride ?? 'ALL';
+    _loadLocations();
     _loadData();
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      final locs = await _locationService.getLocations().first;
+      if (mounted) {
+        setState(() => _availableLocations = locs);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -40,7 +57,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       await _cache.preloadForCurrentUser();
     }
 
-    final locId = widget.locationIdOverride ?? _cache.locationId;
+    final locId = _selectedLocationId == 'ALL'
+        ? (widget.locationIdOverride == 'ALL' ? 'ALL' : _cache.locationId)
+        : _selectedLocationId;
+
     final data = await _cache.getTickets(
       specificLocationId: locId,
     );
@@ -353,6 +373,46 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ],
           ),
           const Spacer(),
+          if (widget.locationIdOverride == 'ALL' && _availableLocations.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.15)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedLocationId,
+                  icon: const Icon(Icons.arrow_drop_down),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedLocationId = val);
+                      _loadData();
+                    }
+                  },
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'ALL',
+                      child: Text('All Facilities (System-Wide)'),
+                    ),
+                    ..._availableLocations.map(
+                      (loc) => DropdownMenuItem(
+                        value: loc.id,
+                        child: Text(loc.locationName),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           // Timeframe selector
           Container(
             decoration: BoxDecoration(

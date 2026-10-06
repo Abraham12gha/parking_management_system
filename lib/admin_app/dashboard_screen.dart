@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'admin_dashboard_screen.dart';
+
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final void Function(int index)? onNavigate;
+
+  const DashboardScreen({super.key, this.onNavigate});
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text("Dashboard Screen"));
+    return AdminDashboardScreen(onNavigate: onNavigate);
   }
 }

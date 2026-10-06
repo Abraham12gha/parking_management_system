@@ -7,10 +7,10 @@ import '../operator_app/analytics_screen.dart';
 import '../operator_app/reports_screen.dart';
 import '../services/app_data_cache.dart';
 import '../services/auth.dart';
-import 'add_location.dart';
 import 'admin_appbar.dart';
 import 'admin_sideBar.dart';
 import 'dashboard_screen.dart';
+import 'locations_management_screen.dart';
 import 'operator_list.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -46,7 +46,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   late final List<Widget> _pages = [
-    const DashboardScreen(),
+    DashboardScreen(onNavigate: _onItemSelected),
 
     OperatorList(
       onAddOperator: () {
@@ -56,8 +56,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       },
     ),
 
-    const AddLocationAdmin(),
-    const DashboardScreen(),
+    const LocationsManagementScreen(),
+    const _PlaceholderPage(icon: Icons.payments_outlined, label: 'Payment Methods'),
     const AnalyticsScreen(
       locationIdOverride: 'ALL',
       locationNameOverride: 'All Locations (System-Wide)',
