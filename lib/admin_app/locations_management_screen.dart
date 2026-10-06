@@ -8,7 +8,8 @@ class LocationsManagementScreen extends StatefulWidget {
   const LocationsManagementScreen({super.key});
 
   @override
-  State<LocationsManagementScreen> createState() => _LocationsManagementScreenState();
+  State<LocationsManagementScreen> createState() =>
+      _LocationsManagementScreenState();
 }
 
 class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
@@ -46,20 +47,29 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
           builder: (context, setDialogState) {
             final theme = Theme.of(context);
             final colorScheme = theme.colorScheme;
-            final int totalSeconds = (currentHours * 3600) + (currentMinutes * 60);
+            final int totalSeconds =
+                (currentHours * 3600) + (currentMinutes * 60);
 
             String formattedTime;
             if (currentHours == 0 && currentMinutes == 0) {
               formattedTime = 'No grace time (billing starts immediately)';
             } else {
               final parts = <String>[];
-              if (currentHours > 0) parts.add('$currentHours ${currentHours == 1 ? 'hour' : 'hours'}');
-              if (currentMinutes > 0) parts.add('$currentMinutes ${currentMinutes == 1 ? 'minute' : 'minutes'}');
+              if (currentHours > 0)
+                parts.add(
+                  '$currentHours ${currentHours == 1 ? 'hour' : 'hours'}',
+                );
+              if (currentMinutes > 0)
+                parts.add(
+                  '$currentMinutes ${currentMinutes == 1 ? 'minute' : 'minutes'}',
+                );
               formattedTime = '${parts.join(' ')} free parking';
             }
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: Padding(
@@ -77,7 +87,11 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                               color: colorScheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(Icons.timer_outlined, color: colorScheme.primary, size: 24),
+                            child: Icon(
+                              Icons.timer_outlined,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -112,7 +126,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                       Text(
                         'Set free parking duration before hourly charges begin. Changes sync instantly to all operators active at this facility.',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                          color: theme.textTheme.bodySmall?.color?.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -121,7 +137,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.3,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: theme.dividerColor),
                         ),
@@ -133,30 +151,40 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                 children: [
                                   Text(
                                     'Hours',
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: theme.textTheme.labelMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline, size: 22),
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          size: 22,
+                                        ),
                                         onPressed: currentHours > 0
-                                            ? () => setDialogState(() => currentHours--)
+                                            ? () => setDialogState(
+                                                () => currentHours--,
+                                              )
                                             : null,
                                       ),
                                       Text(
                                         '$currentHours',
-                                        style: theme.textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.add_circle_outline, size: 22),
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                          size: 22,
+                                        ),
                                         onPressed: currentHours < 24
-                                            ? () => setDialogState(() => currentHours++)
+                                            ? () => setDialogState(
+                                                () => currentHours++,
+                                              )
                                             : null,
                                       ),
                                     ],
@@ -164,37 +192,51 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                 ],
                               ),
                             ),
-                            Container(width: 1, height: 50, color: theme.dividerColor),
+                            Container(
+                              width: 1,
+                              height: 50,
+                              color: theme.dividerColor,
+                            ),
                             // Minutes
                             Expanded(
                               child: Column(
                                 children: [
                                   Text(
                                     'Minutes',
-                                    style: theme.textTheme.labelMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: theme.textTheme.labelMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline, size: 22),
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          size: 22,
+                                        ),
                                         onPressed: currentMinutes >= 5
-                                            ? () => setDialogState(() => currentMinutes -= 5)
+                                            ? () => setDialogState(
+                                                () => currentMinutes -= 5,
+                                              )
                                             : null,
                                       ),
                                       Text(
                                         '$currentMinutes',
-                                        style: theme.textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        style: theme.textTheme.titleLarge
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.add_circle_outline, size: 22),
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                          size: 22,
+                                        ),
                                         onPressed: currentMinutes < 55
-                                            ? () => setDialogState(() => currentMinutes += 5)
+                                            ? () => setDialogState(
+                                                () => currentMinutes += 5,
+                                              )
                                             : null,
                                       ),
                                     ],
@@ -212,7 +254,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                         'Quick Presets:',
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                          color: theme.textTheme.bodySmall?.color?.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -220,56 +264,105 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _presetChip('No grace', 0, 0, currentHours, currentMinutes, (h, m) {
-                            setDialogState(() {
-                              currentHours = h;
-                              currentMinutes = m;
-                            });
-                          }),
-                          _presetChip('10 min', 0, 10, currentHours, currentMinutes, (h, m) {
-                            setDialogState(() {
-                              currentHours = h;
-                              currentMinutes = m;
-                            });
-                          }),
-                          _presetChip('15 min', 0, 15, currentHours, currentMinutes, (h, m) {
-                            setDialogState(() {
-                              currentHours = h;
-                              currentMinutes = m;
-                            });
-                          }),
-                          _presetChip('30 min', 0, 30, currentHours, currentMinutes, (h, m) {
-                            setDialogState(() {
-                              currentHours = h;
-                              currentMinutes = m;
-                            });
-                          }),
-                          _presetChip('45 min', 0, 45, currentHours, currentMinutes, (h, m) {
-                            setDialogState(() {
-                              currentHours = h;
-                              currentMinutes = m;
-                            });
-                          }),
-                          _presetChip('1 hour', 1, 0, currentHours, currentMinutes, (h, m) {
-                            setDialogState(() {
-                              currentHours = h;
-                              currentMinutes = m;
-                            });
-                          }),
+                          _presetChip(
+                            'No grace',
+                            0,
+                            0,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) {
+                              setDialogState(() {
+                                currentHours = h;
+                                currentMinutes = m;
+                              });
+                            },
+                          ),
+                          _presetChip(
+                            '10 min',
+                            0,
+                            10,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) {
+                              setDialogState(() {
+                                currentHours = h;
+                                currentMinutes = m;
+                              });
+                            },
+                          ),
+                          _presetChip(
+                            '15 min',
+                            0,
+                            15,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) {
+                              setDialogState(() {
+                                currentHours = h;
+                                currentMinutes = m;
+                              });
+                            },
+                          ),
+                          _presetChip(
+                            '30 min',
+                            0,
+                            30,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) {
+                              setDialogState(() {
+                                currentHours = h;
+                                currentMinutes = m;
+                              });
+                            },
+                          ),
+                          _presetChip(
+                            '45 min',
+                            0,
+                            45,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) {
+                              setDialogState(() {
+                                currentHours = h;
+                                currentMinutes = m;
+                              });
+                            },
+                          ),
+                          _presetChip(
+                            '1 hour',
+                            1,
+                            0,
+                            currentHours,
+                            currentMinutes,
+                            (h, m) {
+                              setDialogState(() {
+                                currentHours = h;
+                                currentMinutes = m;
+                              });
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
 
                       // Preview summary banner
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.check_circle_outline, color: colorScheme.primary, size: 18),
+                            Icon(
+                              Icons.check_circle_outline,
+                              color: colorScheme.primary,
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -300,8 +393,13 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colorScheme.primary,
                               foregroundColor: colorScheme.onPrimary,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                             onPressed: () async {
                               Navigator.of(dialogCtx).pop();
@@ -316,7 +414,11 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                       backgroundColor: const Color(0xFF2E7D32),
                                       content: Row(
                                         children: [
-                                          const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                                          const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
                                           const SizedBox(width: 10),
                                           Expanded(
                                             child: Text(
@@ -333,7 +435,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       backgroundColor: Colors.redAccent,
-                                      content: Text('Failed to update grace time: $e'),
+                                      content: Text(
+                                        'Failed to update grace time: $e',
+                                      ),
                                     ),
                                   );
                                 }
@@ -363,7 +467,13 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
   ) {
     final isSelected = curH == hours && curM == minutes;
     return ChoiceChip(
-      label: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
       selected: isSelected,
       onSelected: (_) => onSelect(hours, minutes),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -373,7 +483,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
   void _openEditLocationDialog(BuildContext context, LocationModel location) {
     final nameCtrl = TextEditingController(text: location.locationName);
     final addrCtrl = TextEditingController(text: location.address);
-    final chargesCtrl = TextEditingController(text: location.parkingCharges.toString());
+    final chargesCtrl = TextEditingController(
+      text: location.parkingCharges.toString(),
+    );
     int hours = location.graceTimeSeconds ~/ 3600;
     int mins = (location.graceTimeSeconds % 3600) ~/ 60;
     final formKey = GlobalKey<FormState>();
@@ -385,7 +497,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
           builder: (context, setDialogState) {
             final theme = Theme.of(context);
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Padding(
@@ -399,11 +513,16 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.edit_location_alt_outlined, color: theme.colorScheme.primary),
+                              Icon(
+                                Icons.edit_location_alt_outlined,
+                                color: theme.colorScheme.primary,
+                              ),
                               const SizedBox(width: 10),
                               Text(
                                 'Edit Location Details',
-                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -414,7 +533,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                               labelText: 'Location Name',
                               prefixIcon: Icon(Icons.business_outlined),
                             ),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Enter location name' : null,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Enter location name'
+                                : null,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -424,7 +545,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                               labelText: 'Address',
                               prefixIcon: Icon(Icons.place_outlined),
                             ),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Enter address' : null,
+                            validator: (v) => v == null || v.trim().isEmpty
+                                ? 'Enter address'
+                                : null,
                           ),
                           const SizedBox(height: 14),
                           TextFormField(
@@ -435,28 +558,54 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                               prefixIcon: Icon(Icons.payments_outlined),
                               prefixText: 'Rs. ',
                             ),
-                            validator: (v) => v == null || int.tryParse(v.trim()) == null ? 'Enter valid rate' : null,
+                            validator: (v) =>
+                                v == null || int.tryParse(v.trim()) == null
+                                ? 'Enter valid rate'
+                                : null,
                           ),
                           const SizedBox(height: 16),
-                          Text('Grace Period:', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Grace Period:',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<int>(
                                   value: hours,
-                                  decoration: const InputDecoration(labelText: 'Hours'),
-                                  items: List.generate(25, (i) => DropdownMenuItem(value: i, child: Text('$i hrs'))),
-                                  onChanged: (v) => setDialogState(() => hours = v ?? 0),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Hours',
+                                  ),
+                                  items: List.generate(
+                                    25,
+                                    (i) => DropdownMenuItem(
+                                      value: i,
+                                      child: Text('$i hrs'),
+                                    ),
+                                  ),
+                                  onChanged: (v) =>
+                                      setDialogState(() => hours = v ?? 0),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: DropdownButtonFormField<int>(
                                   value: (mins ~/ 5) * 5,
-                                  decoration: const InputDecoration(labelText: 'Minutes'),
-                                  items: List.generate(12, (i) => DropdownMenuItem(value: i * 5, child: Text('${i * 5} min'))),
-                                  onChanged: (v) => setDialogState(() => mins = v ?? 0),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Minutes',
+                                  ),
+                                  items: List.generate(
+                                    12,
+                                    (i) => DropdownMenuItem(
+                                      value: i * 5,
+                                      child: Text('${i * 5} min'),
+                                    ),
+                                  ),
+                                  onChanged: (v) =>
+                                      setDialogState(() => mins = v ?? 0),
                                 ),
                               ),
                             ],
@@ -479,12 +628,18 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                     locationId: location.id,
                                     locationName: nameCtrl.text.trim(),
                                     address: addrCtrl.text.trim(),
-                                    parkingCharges: int.parse(chargesCtrl.text.trim()),
+                                    parkingCharges: int.parse(
+                                      chargesCtrl.text.trim(),
+                                    ),
                                     graceTimeSeconds: totalSec,
                                   );
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Location updated successfully')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Location updated successfully',
+                                        ),
+                                      ),
                                     );
                                   }
                                 },
@@ -510,20 +665,29 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Delete Location'),
-        content: Text('Are you sure you want to remove "${location.locationName}"? This action cannot be undone.'),
+        content: Text(
+          'Are you sure you want to remove "${location.locationName}"? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               Navigator.of(dialogCtx).pop();
               await _locationService.deleteLocation(location.id);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Location "${location.locationName}" deleted')),
+                  SnackBar(
+                    content: Text(
+                      'Location "${location.locationName}" deleted',
+                    ),
+                  ),
                 );
               }
             },
@@ -534,32 +698,53 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
     );
   }
 
-  Future<void> _showLocationAnalysis(BuildContext context, LocationModel location) async {
+  Future<void> _showLocationAnalysis(
+    BuildContext context,
+    LocationModel location,
+  ) async {
     final result = await FirebaseFirestore.instance
         .collection('parking_tickets')
         .where('locationId', isEqualTo: location.id)
         .get();
     final tickets = result.docs.map((doc) => doc.data()).toList();
-    final active = tickets.where((ticket) => '${ticket['status']}'.toLowerCase() == 'in').length;
+    final active = tickets
+        .where((ticket) => '${ticket['status']}'.toLowerCase() == 'in')
+        .length;
     final completed = tickets.length - active;
     final revenue = tickets.fold<num>(0, (sum, ticket) {
       if ('${ticket['status']}'.toLowerCase() == 'in') return sum;
-      return sum + (ticket['checkoutAmount'] as num? ?? ticket['finalParkingCharges'] as num? ?? ticket['charges'] as num? ?? 0);
+      return sum +
+          (ticket['checkoutAmount'] as num? ??
+              ticket['finalParkingCharges'] as num? ??
+              ticket['charges'] as num? ??
+              0);
     });
     if (!mounted) return;
-    showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
-      title: Text('${location.locationName} Analysis'),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('All-time ticket records: ${tickets.length}'),
-        const SizedBox(height: 8),
-        Text('Currently parked: $active'),
-        const SizedBox(height: 8),
-        Text('Completed visits: $completed'),
-        const SizedBox(height: 8),
-        Text('Recorded revenue: Rs. ${revenue.toStringAsFixed(0)}'),
-      ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
-    ));
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('${location.locationName} Analysis'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('All-time ticket records: ${tickets.length}'),
+            const SizedBox(height: 8),
+            Text('Currently parked: $active'),
+            const SizedBox(height: 8),
+            Text('Completed visits: $completed'),
+            const SizedBox(height: 8),
+            Text('Recorded revenue: Rs. ${revenue.toStringAsFixed(0)}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -627,49 +812,71 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Icons.location_city_rounded, color: colorScheme.primary, size: 28),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Locations & Grace Periods',
-                                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Manage facility rates and grace periods. Changing grace time immediately updates all operators in real time.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary.withValues(
+                                    alpha: 0.1,
                                   ),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              ],
-                            ),
+                                child: Icon(
+                                  Icons.location_city_rounded,
+                                  color: colorScheme.primary,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Locations & Grace Periods',
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Manage facility rates and grace periods. Changing grace time immediately updates all operators in real time.',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.color
+                                                ?.withValues(alpha: 0.65),
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          ]),
                           const SizedBox(height: 12),
                           Align(
                             alignment: Alignment.centerRight,
-                          ElevatedButton.icon(
-                            onPressed: () => setState(() => _showAddForm = true),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Add Location'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: colorScheme.primary,
-                              foregroundColor: colorScheme.onPrimary,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            child: ElevatedButton.icon(
+                              onPressed: () =>
+                                  setState(() => _showAddForm = true),
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Add Location'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
                             ),
-                          ),
                           ),
                         ],
                       ),
@@ -677,32 +884,73 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                     const SizedBox(height: 20),
 
                     // Search and Stats Bar
-                    LayoutBuilder(builder: (context, searchConstraints) {
-                      final compact = searchConstraints.maxWidth < 520;
-                      final searchField = TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: 'Search location by name or address...',
-                              prefixIcon: const Icon(Icons.search_rounded),
-                              suffixIcon: _searchQuery.isNotEmpty
-                                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () => _searchController.clear())
-                                  : null,
-                              filled: true,
-                              fillColor: colorScheme.surface,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.dividerColor)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    LayoutBuilder(
+                      builder: (context, searchConstraints) {
+                        final compact = searchConstraints.maxWidth < 520;
+                        final searchField = TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search location by name or address...',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () => _searchController.clear(),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: colorScheme.surface,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                          );
-                      final total = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(color: colorScheme.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: theme.dividerColor)),
-                        child: Text('Total Locations: ${allLocations.length}', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                      );
-                      return compact
-                          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [searchField, const SizedBox(height: 10), Align(alignment: Alignment.centerRight, child: total)])
-                          : Row(children: [Expanded(child: searchField), const SizedBox(width: 16), total]);
-                    }),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: theme.dividerColor),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                        );
+                        final total = Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: theme.dividerColor),
+                          ),
+                          child: Text(
+                            'Total Locations: ${allLocations.length}',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        );
+                        return compact
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  searchField,
+                                  const SizedBox(height: 10),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: total,
+                                  ),
+                                ],
+                              )
+                            : Row(
+                                children: [
+                                  Expanded(child: searchField),
+                                  const SizedBox(width: 16),
+                                  total,
+                                ],
+                              );
+                      },
+                    ),
                     const SizedBox(height: 20),
 
                     // Location Cards Grid
@@ -717,16 +965,25 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.location_off_outlined, size: 48, color: Colors.grey.shade400),
+                            Icon(
+                              Icons.location_off_outlined,
+                              size: 48,
+                              color: Colors.grey.shade400,
+                            ),
                             const SizedBox(height: 12),
                             Text(
-                              _searchQuery.isEmpty ? 'No parking locations found' : 'No locations matching "$_searchQuery"',
-                              style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
+                              _searchQuery.isEmpty
+                                  ? 'No parking locations found'
+                                  : 'No locations matching "$_searchQuery"',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.grey.shade600,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             if (_searchQuery.isEmpty)
                               ElevatedButton(
-                                onPressed: () => setState(() => _showAddForm = true),
+                                onPressed: () =>
+                                    setState(() => _showAddForm = true),
                                 child: const Text('Add First Location'),
                               ),
                           ],
@@ -790,7 +1047,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  location.numericId > 0 ? '#LOC-${location.numericId.toString().padLeft(2, '0')}' : '#LOC',
+                  location.numericId > 0
+                      ? '#LOC-${location.numericId.toString().padLeft(2, '0')}'
+                      : '#LOC',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -802,7 +1061,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
               Expanded(
                 child: Text(
                   location.locationName,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -814,9 +1075,21 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                   if (v == 'delete') _confirmDeleteLocation(context, location);
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'grace', child: Text('Change Grace Time')),
-                  const PopupMenuItem(value: 'edit', child: Text('Edit Details')),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete Location', style: TextStyle(color: Colors.red))),
+                  const PopupMenuItem(
+                    value: 'grace',
+                    child: Text('Change Grace Time'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Edit Details'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text(
+                      'Delete Location',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -826,12 +1099,18 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
           // Address
           Row(
             children: [
-              Icon(Icons.location_on_outlined, size: 16, color: Colors.grey.shade500),
+              Icon(
+                Icons.location_on_outlined,
+                size: 16,
+                color: Colors.grey.shade500,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   location.address,
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -847,7 +1126,10 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
             children: [
               // Rate Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1976D2).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -855,7 +1137,11 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.payments_outlined, size: 15, color: Color(0xFF1976D2)),
+                    const Icon(
+                      Icons.payments_outlined,
+                      size: 15,
+                      color: Color(0xFF1976D2),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Rs. ${location.parkingCharges}/hr',
@@ -871,7 +1157,10 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
 
               // Grace Time Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: hasGrace
                       ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
@@ -884,15 +1173,21 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                     Icon(
                       Icons.timer_outlined,
                       size: 15,
-                      color: hasGrace ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+                      color: hasGrace
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey.shade700,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      hasGrace ? 'Grace: ${location.formattedGraceTime}' : 'No Grace Period',
+                      hasGrace
+                          ? 'Grace: ${location.formattedGraceTime}'
+                          : 'No Grace Period',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.bold,
-                        color: hasGrace ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+                        color: hasGrace
+                            ? const Color(0xFF2E7D32)
+                            : Colors.grey.shade700,
                       ),
                     ),
                   ],
@@ -909,7 +1204,10 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                 builder: (context, snap) {
                   final count = snap.data?.docs.length ?? 0;
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE65100).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -917,7 +1215,11 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.directions_car_filled_rounded, size: 15, color: Color(0xFFE65100)),
+                        const Icon(
+                          Icons.directions_car_filled_rounded,
+                          size: 15,
+                          color: Color(0xFFE65100),
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           '$count Parked',
@@ -959,8 +1261,13 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ],
