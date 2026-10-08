@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../resources/widget/app_toast.dart';
 import '../services/parking_charges_service.dart';
 import '../services/parking_ticket_service.dart';
 
@@ -43,21 +45,30 @@ class _CarinScreenState extends State<CarinScreen> {
     final vehicleNumber = _vehicleNumberController.text.trim().toUpperCase();
 
     if (vehicleNumber.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the vehicle number.')),
+      AppToast.warning(
+        context,
+        'Vehicle number required',
+        'Enter a vehicle number to continue.',
       );
       return;
     }
 
     final plateRegex = RegExp(r'^[A-Z]{3}-\d{3,4}$');
     if (!plateRegex.hasMatch(vehicleNumber)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.redAccent,
-          content: Text(
-            'Invalid format! Vehicle number must be ABC-123 or ABC-1234 (e.g. LEA-123 or KHI-1234).',
-          ),
-        ),
+      AppToast.error(
+        context,
+        'Check the vehicle number',
+        'Use ABC-123 or ABC-1234 (for example, LEA-123).',
+      );
+      return;
+    }
+
+    if (_selectedCategory == VehicleCategory.valetParking &&
+        _driverNameController.text.trim().isEmpty) {
+      AppToast.warning(
+        context,
+        'Driver name required',
+        'Enter the valet driver name to continue.',
       );
       return;
     }
@@ -94,20 +105,33 @@ class _CarinScreenState extends State<CarinScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Vehicle entry saved successfully. Ticket ID: $ticketId',
-          ),
-        ),
+      String? ticketNumber;
+      try {
+        final ticket = await FirebaseFirestore.instance
+            .collection('parking_tickets')
+            .doc(ticketId)
+            .get();
+        ticketNumber = ticket.data()?['ticketNumber']?.toString();
+      } catch (_) {
+        // The vehicle entry is already saved; a display lookup must not undo it.
+      }
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        'Vehicle checked in',
+        ticketNumber?.isNotEmpty == true
+            ? 'Ticket ${ticketNumber!} is ready.'
+            : 'Vehicle entry saved successfully.',
       );
 
       widget.onBack();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to save vehicle entry: $e')),
+      AppToast.error(
+        context,
+        'Could not check in vehicle',
+        'Unable to save vehicle entry: $e',
       );
     } finally {
       if (mounted) {
@@ -122,32 +146,33 @@ class _CarinScreenState extends State<CarinScreen> {
   Widget build(BuildContext context) {
     return Container(
       color: Theme.of(context).colorScheme.surface,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8F7),
-                borderRadius: BorderRadius.circular(16),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: EdgeInsets.all(constraints.maxWidth < 700 ? 16 : 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: constraints.maxWidth < 1000
+                    ? constraints.maxWidth
+                    : 1000,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _DialogHeader(onClose: widget.onBack),
-                  SingleChildScrollView(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _DialogHeader(onClose: widget.onBack),
+                    Padding(
                       padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Vehicle Category',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 12),
                           _CategorySelector(
@@ -157,13 +182,9 @@ class _CarinScreenState extends State<CarinScreen> {
                             },
                           ),
                           const SizedBox(height: 24),
-                          const Text(
+                          Text(
                             'Vehicle Details',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 16),
                           _VehicleDetailsForm(
@@ -171,16 +192,20 @@ class _CarinScreenState extends State<CarinScreen> {
                             driverNameController: _driverNameController,
                             phoneNumberController: _phoneNumberController,
                             notesController: _notesController,
+                            driverNameRequired:
+                                _selectedCategory ==
+                                VehicleCategory.valetParking,
                           ),
                         ],
                       ),
-                  ),
-                  _DialogFooter(
-                    onCancel: widget.onBack,
-                    onGenerateTicket: _generateTicket,
-                    isSaving: _isSaving,
-                  ),
-                ],
+                    ),
+                    _DialogFooter(
+                      onCancel: widget.onBack,
+                      onGenerateTicket: _generateTicket,
+                      isSaving: _isSaving,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -231,10 +256,11 @@ class _DialogHeaderState extends State<_DialogHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
-      decoration: const BoxDecoration(
-        color: Color(0xFFEFF1EF),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(16),
           topRight: Radius.circular(16),
@@ -249,11 +275,9 @@ class _DialogHeaderState extends State<_DialogHeader> {
               children: [
                 Text(
                   'New Vehicle Entry',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(color: colors.onSurface),
                 ),
 
                 const SizedBox(height: 8),
@@ -273,7 +297,7 @@ class _DialogHeaderState extends State<_DialogHeader> {
           IconButton(
             onPressed: widget.onClose,
             icon: const Icon(Icons.close),
-            color: const Color(0xFF616161),
+            color: colors.onSurfaceVariant,
           ),
         ],
       ),
@@ -296,17 +320,18 @@ class _HeaderMetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const textStyle = TextStyle(fontSize: 13, color: Color(0xFF616161));
+    final colors = Theme.of(context).colorScheme;
+    final textStyle = TextStyle(fontSize: 12, color: colors.onSurfaceVariant);
 
     const spacing = SizedBox(width: 10);
 
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Icon(
+        Icon(
           Icons.confirmation_number_outlined,
           size: 15,
-          color: Color(0xFF616161),
+          color: colors.onSurfaceVariant,
         ),
 
         const SizedBox(width: 4),
@@ -315,11 +340,11 @@ class _HeaderMetaRow extends StatelessWidget {
 
         spacing,
 
-        const Text('•', style: textStyle),
+        Text('•', style: textStyle),
 
         spacing,
 
-        const Icon(Icons.access_time, size: 15, color: Color(0xFF616161)),
+        Icon(Icons.access_time, size: 15, color: colors.onSurfaceVariant),
 
         const SizedBox(width: 4),
 
@@ -327,14 +352,14 @@ class _HeaderMetaRow extends StatelessWidget {
 
         spacing,
 
-        const Text('•', style: textStyle),
+        Text('•', style: textStyle),
 
         spacing,
 
-        const Icon(
+        Icon(
           Icons.local_parking_outlined,
           size: 15,
-          color: Color(0xFF616161),
+          color: colors.onSurfaceVariant,
         ),
 
         const SizedBox(width: 4),
@@ -348,7 +373,7 @@ class _HeaderMetaRow extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 1.5),
           )
         else
-          const Text('Charge unavailable', style: textStyle),
+          Text('Charge unavailable', style: textStyle),
       ],
     );
   }
@@ -423,12 +448,14 @@ class _CategoryCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 18),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFA8E6A3) : Colors.white,
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.12)
+              : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected
                 ? theme.colorScheme.primary
-                : const Color(0xFFE0E0E0),
+                : theme.colorScheme.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -437,7 +464,9 @@ class _CategoryCard extends StatelessWidget {
             Icon(
               icon,
               size: 28,
-              color: isSelected ? Colors.black87 : const Color(0xFF424242),
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 8),
             Text(
@@ -445,7 +474,9 @@ class _CategoryCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.black87 : const Color(0xFF424242),
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
               ),
             ),
           ],
@@ -465,12 +496,14 @@ class _VehicleDetailsForm extends StatelessWidget {
   final TextEditingController driverNameController;
   final TextEditingController phoneNumberController;
   final TextEditingController notesController;
+  final bool driverNameRequired;
 
   const _VehicleDetailsForm({
     required this.vehicleNumberController,
     required this.driverNameController,
     required this.phoneNumberController,
     required this.notesController,
+    required this.driverNameRequired,
   });
 
   @override
@@ -498,8 +531,9 @@ class _VehicleDetailsForm extends StatelessWidget {
             Expanded(
               child: _FormField(
                 label: 'Driver Name',
+                isRequired: driverNameRequired,
                 controller: driverNameController,
-                hintText: 'Optional',
+                hintText: driverNameRequired ? 'Enter driver name' : 'Optional',
                 icon: Icons.person_outline,
               ),
             ),
@@ -563,26 +597,20 @@ class _FormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
-              ),
-            ),
+            Text(label, style: Theme.of(context).textTheme.labelLarge),
             if (isRequired)
-              const Text(
+              Text(
                 ' *',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color: colors.error,
                 ),
               ),
           ],
@@ -597,27 +625,27 @@ class _FormField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hintText,
             helperText: helperText,
-            helperStyle: const TextStyle(fontSize: 11, color: Color(0xFF757575)),
-            hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+            helperStyle: Theme.of(context).textTheme.bodySmall,
+            hintStyle: Theme.of(context).inputDecorationTheme.hintStyle,
             prefixIcon: maxLines > 1
                 ? Padding(
                     padding: const EdgeInsets.only(bottom: 40),
-                    child: Icon(icon, size: 18, color: const Color(0xFF9E9E9E)),
+                    child: Icon(icon, size: 18, color: colors.onSurfaceVariant),
                   )
-                : Icon(icon, size: 18, color: const Color(0xFF9E9E9E)),
+                : Icon(icon, size: 18, color: colors.onSurfaceVariant),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 12,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+              borderSide: BorderSide(color: colors.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+              borderSide: BorderSide(color: colors.outlineVariant),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -640,7 +668,10 @@ class LicensePlateFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    String text = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9\-]'), '');
+    String text = newValue.text.toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9\-]'),
+      '',
+    );
 
     // Disallow leading hyphen or digits
     if (text.startsWith('-') || RegExp(r'^[0-9]').hasMatch(text)) {
@@ -650,10 +681,17 @@ class LicensePlateFormatter extends TextInputFormatter {
     if (text.contains('-')) {
       final parts = text.split('-');
       final letters = parts[0].replaceAll(RegExp(r'[^A-Z]'), '');
-      final limitedLetters = letters.length > 3 ? letters.substring(0, 3) : letters;
+      final limitedLetters = letters.length > 3
+          ? letters.substring(0, 3)
+          : letters;
 
-      final numbers = parts.sublist(1).join('').replaceAll(RegExp(r'[^0-9]'), '');
-      final limitedNumbers = numbers.length > 4 ? numbers.substring(0, 4) : numbers;
+      final numbers = parts
+          .sublist(1)
+          .join('')
+          .replaceAll(RegExp(r'[^0-9]'), '');
+      final limitedNumbers = numbers.length > 4
+          ? numbers.substring(0, 4)
+          : numbers;
 
       text = '$limitedLetters-$limitedNumbers';
     } else {
@@ -714,8 +752,8 @@ class _DialogFooter extends StatelessWidget {
           OutlinedButton(
             onPressed: isSaving ? null : onCancel,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF424242),
-              side: const BorderSide(color: Color(0xFFBDBDBD)),
+              foregroundColor: theme.colorScheme.onSurface,
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -730,7 +768,7 @@ class _DialogFooter extends StatelessWidget {
             onPressed: isSaving ? null : onGenerateTicket,
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.colorScheme.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: theme.colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -738,12 +776,12 @@ class _DialogFooter extends StatelessWidget {
               ),
             ),
             icon: isSaving
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   )
                 : const Icon(Icons.local_print_shop_outlined, size: 18),
