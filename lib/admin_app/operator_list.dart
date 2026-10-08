@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../resources/widget/app_toast.dart';
 import 'add_operator_admin.dart';
 
 class OperatorList extends StatefulWidget {
@@ -1171,9 +1172,7 @@ class _OperatorListState extends State<OperatorList> {
     BuildContext context,
     QueryDocumentSnapshot<Map<String, dynamic>> document,
   ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit Operator will be available here.')),
-    );
+    AppToast.information(context, 'Edit operator', 'This action is not available yet.');
   }
 
   // ================================================================
@@ -1298,23 +1297,17 @@ class _OperatorListState extends State<OperatorList> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            currentlyDisabled
-                ? '$displayName has been enabled.'
-                : '$displayName has been disabled.',
-          ),
-        ),
+      AppToast.success(
+        context,
+        currentlyDisabled ? 'Operator enabled' : 'Operator disabled',
+        currentlyDisabled ? '$displayName can sign in again.' : '$displayName can no longer sign in.',
       );
     } catch (_) {
       if (!context.mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to update the account.')),
-      );
+      AppToast.error(context, 'Could not update account', 'Unable to update the account.');
     }
   }
 
@@ -1370,17 +1363,13 @@ class _OperatorListState extends State<OperatorList> {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('$displayName has been deleted.')));
+      AppToast.success(context, 'Operator deleted', '$displayName has been removed.');
     } catch (_) {
       if (!context.mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to delete the operator.')),
-      );
+      AppToast.error(context, 'Could not delete operator', 'Unable to delete the operator.');
     }
   }
 }
