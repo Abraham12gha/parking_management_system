@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:parking_management_system/admin_app/add_operator_admin.dart';
-import 'package:parking_management_system/admin_app/settings_admin.dart';
 import 'package:parking_management_system/operator_app/settings_operator.dart';
-import '../auth_wrapper.dart';
-import '../login_screen.dart';
+import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
 import '../services/auth.dart';
 import 'Active_Vehicles_screen.dart';
@@ -33,6 +30,7 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
 
     return _titles[_selectedIndex];
   }
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Auth _auth = Auth();
   Widget? _currentPage;
@@ -62,22 +60,13 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
     AppDataCache.instance.preloadForCurrentUser();
 
     _pages = [
-      OperatorDashboardBody(
-        onCarIn: _openCarIn,
-        onCarOut: _openCarOut,
-      ),
+      OperatorDashboardBody(onCarIn: _openCarIn, onCarOut: _openCarOut),
       const ActiveVehiclesScreen(),
       const OutCarsScreen(),
       const ReportsScreen(),
-      const _PlaceholderPage(
-        icon: Icons.payment,
-        label: 'Payment',
-      ),
+      const _PlaceholderPage(icon: Icons.payment, label: 'Payment'),
       const AnalyticsScreen(),
-      const _PlaceholderPage(
-        icon: Icons.backup,
-        label: 'Backup',
-      ),
+      const _PlaceholderPage(icon: Icons.backup, label: 'Backup'),
       const SettingScreenOperator(),
     ];
   }
@@ -93,7 +82,9 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
       _pages[index] = ReportsScreen(key: ValueKey('reports-$_reportVersion'));
     }
     if (index == 5) {
-      _pages[index] = AnalyticsScreen(key: ValueKey('analytics-$_reportVersion'));
+      _pages[index] = AnalyticsScreen(
+        key: ValueKey('analytics-$_reportVersion'),
+      );
     }
     setState(() {
       _selectedIndex = index;
@@ -111,9 +102,7 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Logout'),
-          content: const Text(
-            'Are you sure you want to logout?',
-          ),
+          content: const Text('Are you sure you want to logout?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -140,38 +129,26 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
 
       if (!mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const AuthWrapper(),
-        ),
-            (route) => false,
-      );
+      // The root auth-state listener returns to login and preserves the shell.
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not logout: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      AppToast.error(context, 'Could not log out', '$e');
     }
   }
 
   void _openCarIn() {
     setState(() {
-      _currentPage = CarinScreen(
-        onBack: _backToDashboard,
-      );
+      _currentPage = CarinScreen(onBack: _backToDashboard);
     });
   }
+
   void _openCarOut() {
     setState(() {
-      _currentPage = CaroutScreen(
-        onBack: _backToDashboard,
-      );
+      _currentPage = CaroutScreen(onBack: _backToDashboard);
     });
   }
+
   void _backToDashboard() {
     setState(() {
       _currentPage = null;
@@ -189,12 +166,12 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
           drawer: isDesktop
               ? null
               : Drawer(
-            child: OperatorSidebar(
-              selectedIndex: _selectedIndex,
-              onItemSelected: _onItemSelected,
-              width: double.infinity,
-            ),
-          ),
+                  child: OperatorSidebar(
+                    selectedIndex: _selectedIndex,
+                    onItemSelected: _onItemSelected,
+                    width: double.infinity,
+                  ),
+                ),
           body: Row(
             children: [
               if (isDesktop)
@@ -206,13 +183,12 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
               Expanded(
                 child: Column(
                   children: [
-                    OperatorAppbar(
-                      title: _currentTitle,
-                    ),
+                    OperatorAppbar(title: _currentTitle),
                     Expanded(
                       child: Container(
                         color: Theme.of(context).colorScheme.surface,
-                        child: _currentPage ??
+                        child:
+                            _currentPage ??
                             IndexedStack(
                               index: _selectedIndex,
                               children: _pages,
