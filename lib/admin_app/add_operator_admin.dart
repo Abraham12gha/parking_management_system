@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../resources/widget/app_toast.dart';
 
 import '../app_model/location_model.dart';
 import '../services/auth.dart';
@@ -69,14 +70,7 @@ class _AddOperatorState extends State<AddOperator> {
       if (!mounted) return;
 
       if (user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Operator "$name" created successfully.',
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppToast.success(context, 'Operator added', '"$name" can now sign in.');
 
         _clearForm();
       }
@@ -102,21 +96,11 @@ class _AddOperatorState extends State<AddOperator> {
           message = e.message ?? 'Failed to create operator.';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.error(context, 'Could not add operator', message);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Something went wrong. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.error(context, 'Could not add operator', 'Something went wrong. Please try again.');
     } finally {
       if (mounted) {
         setState(() {
