@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../resources/widget/app_toast.dart';
 import '../app_model/location_model.dart';
 import '../services/location_service.dart';
 import 'add_location.dart';
@@ -409,36 +410,18 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                   graceTimeSeconds: totalSeconds,
                                 );
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: const Color(0xFF2E7D32),
-                                      content: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.check_circle,
-                                            color: Colors.white,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Text(
-                                              'Grace time updated to ${location.formattedGraceTime} for "${location.locationName}". Operators updated in real time!',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                  AppToast.success(
+                                    context,
+                                    'Grace time updated',
+                                    '${location.locationName} now allows ${location.formattedGraceTime}. Operators updated in real time.',
                                   );
                                 }
                               } catch (e) {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: Colors.redAccent,
-                                      content: Text(
-                                        'Failed to update grace time: $e',
-                                      ),
-                                    ),
+                                  AppToast.error(
+                                    context,
+                                    'Could not update grace time',
+                                    'Failed to update grace time: $e',
                                   );
                                 }
                               }
@@ -634,12 +617,10 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                     graceTimeSeconds: totalSec,
                                   );
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Location updated successfully',
-                                        ),
-                                      ),
+                                    AppToast.success(
+                                      context,
+                                      'Location updated',
+                                      'Your changes have been saved.',
                                     );
                                   }
                                 },
@@ -682,12 +663,10 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
               Navigator.of(dialogCtx).pop();
               await _locationService.deleteLocation(location.id);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Location "${location.locationName}" deleted',
-                    ),
-                  ),
+                AppToast.success(
+                  context,
+                  'Location deleted',
+                  '"${location.locationName}" was removed.',
                 );
               }
             },
