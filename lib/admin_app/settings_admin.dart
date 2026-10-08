@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../resources/widget/app_toast.dart';
 import '../services/cloudinary_service.dart';
 import '../services/company_settings_service.dart';
 import '../theme_controller.dart';
@@ -137,13 +138,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isError ? Colors.redAccent : Theme.of(context).colorScheme.primary,
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, 'Could not save settings', message);
+    } else {
+      AppToast.success(context, 'Settings saved', message);
+    }
   }
 
   Future<void> _loadCompanySettings() async {
