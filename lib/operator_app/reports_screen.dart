@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../resources/widget/app_toast.dart';
 import '../app_model/parking_ticket_model.dart';
 import '../services/app_data_cache.dart';
 import '../services/report_download.dart';
@@ -1061,12 +1062,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           Clipboard.setData(
                             ClipboardData(text: ticket.ticketNumber),
                           );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Copied ${ticket.ticketNumber}'),
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
+                          AppToast.information(context, 'Ticket number copied', ticket.ticketNumber);
                         },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1598,17 +1594,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   );
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Report downloaded: $savedTo'),
-                      backgroundColor: const Color(0xFF1B5E20),
-                    ),
-                  );
+                  AppToast.success(context, 'Report downloaded', savedTo);
                 } catch (e) {
                   if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not download report: $e')),
-                  );
+                  AppToast.error(context, 'Could not download report', '$e');
                 }
               },
               icon: const Icon(Icons.download_rounded, size: 18),
