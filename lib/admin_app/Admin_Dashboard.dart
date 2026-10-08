@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
-import '../auth_wrapper.dart';
-import '../login_screen.dart';
+import '../resources/widget/app_toast.dart';
 import '../operator_app/analytics_screen.dart';
 import '../operator_app/reports_screen.dart';
 import '../services/app_data_cache.dart';
@@ -57,7 +56,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ),
 
     const LocationsManagementScreen(),
-    const _PlaceholderPage(icon: Icons.payments_outlined, label: 'Payment Methods'),
+    const _PlaceholderPage(
+      icon: Icons.payments_outlined,
+      label: 'Payment Methods',
+    ),
     const AnalyticsScreen(
       locationIdOverride: 'ALL',
       locationNameOverride: 'All Locations (System-Wide)',
@@ -86,9 +88,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Logout'),
-          content: const Text(
-            'Are you sure you want to logout?',
-          ),
+          content: const Text('Are you sure you want to logout?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -115,23 +115,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
       if (!mounted) return;
 
-      // Go back to the login screen.
-      // Replace LoginScreen() with your actual login screen widget.
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const AuthWrapper(),
-        ),
-            (route) => false,
-      );
+      // The root auth-state listener returns to login and preserves the shell.
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not logout: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      AppToast.error(context, 'Could not log out', '$e');
     }
   }
 
@@ -146,12 +134,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           drawer: isDesktop
               ? null
               : Drawer(
-            child: AdminSidebar(
-              selectedIndex: _selectedIndex,
-              onItemSelected: _onItemSelected,
-              width: double.infinity,
-            ),
-          ),
+                  child: AdminSidebar(
+                    selectedIndex: _selectedIndex,
+                    onItemSelected: _onItemSelected,
+                    width: double.infinity,
+                  ),
+                ),
           body: Row(
             children: [
               if (isDesktop)
@@ -174,16 +162,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     Expanded(
                       child: _showAddOperator
                           ? AddOperator(
-                        onBack: () {
-                          setState(() {
-                            _showAddOperator = false;
-                          });
-                        },
-                      )
+                              onBack: () {
+                                setState(() {
+                                  _showAddOperator = false;
+                                });
+                              },
+                            )
                           : IndexedStack(
-                        index: _selectedIndex,
-                        children: _pages,
-                      ),
+                              index: _selectedIndex,
+                              children: _pages,
+                            ),
                     ),
                   ],
                 ),
