@@ -3,15 +3,13 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
 
 class CaroutScreen extends StatefulWidget {
   final VoidCallback onBack;
 
-  const CaroutScreen({
-    super.key,
-    required this.onBack,
-  });
+  const CaroutScreen({super.key, required this.onBack});
 
   @override
   State<CaroutScreen> createState() => _CaroutScreenState();
@@ -19,6 +17,8 @@ class CaroutScreen extends StatefulWidget {
 
 class _CaroutScreenState extends State<CaroutScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  bool _savingNotes = false;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -46,20 +46,18 @@ class _CaroutScreenState extends State<CaroutScreen> {
     //
     // 15 seconds is enough because your billing thresholds are measured
     // in minutes.
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 15),
-          (_) {
-        if (mounted) {
-          setState(() {});
-        }
-      },
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   Future<void> _initializeLocationStream() async {
     try {
       String? locationId;
-      if (AppDataCache.instance.isLoaded && AppDataCache.instance.locationId != null) {
+      if (AppDataCache.instance.isLoaded &&
+          AppDataCache.instance.locationId != null) {
         locationId = AppDataCache.instance.locationId;
       } else {
         final user = _auth.currentUser;
@@ -110,6 +108,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     _searchController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -117,28 +116,19 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // FIRESTORE STREAM
   // ===========================================================================
 
-  List<_Vehicle> _mapVehicles(
-      QuerySnapshot<Map<String, dynamic>> snapshot,
-      ) {
+  List<_Vehicle> _mapVehicles(QuerySnapshot<Map<String, dynamic>> snapshot) {
     final vehicles = snapshot.docs
-        .map(
-          (doc) => _Vehicle.fromFirestore(
-        doc.id,
-        doc.data(),
-      ),
-    )
+        .map((doc) => _Vehicle.fromFirestore(doc.id, doc.data()))
         .where((vehicle) => vehicle.startTime != null)
         .toList();
 
     // Newest tickets first.
-    vehicles.sort(
-          (a, b) {
-        final aTime = a.startTime ?? DateTime(2000);
-        final bTime = b.startTime ?? DateTime(2000);
+    vehicles.sort((a, b) {
+      final aTime = a.startTime ?? DateTime(2000);
+      final bTime = b.startTime ?? DateTime(2000);
 
-        return bTime.compareTo(aTime);
-      },
-    );
+      return bTime.compareTo(aTime);
+    });
 
     return vehicles;
   }
@@ -165,26 +155,21 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // FILTER
   // ===========================================================================
 
-  List<_Vehicle> _filterVehicles(
-      List<_Vehicle> vehicles,
-      ) {
+  List<_Vehicle> _filterVehicles(List<_Vehicle> vehicles) {
     final query = _searchQuery.trim().toLowerCase();
 
-    return vehicles.where(
-          (vehicle) {
-        final matchesSearch =
-            query.isEmpty ||
-                vehicle.vehicleNumber.toLowerCase().contains(query) ||
-                vehicle.ticketNumber.toLowerCase().contains(query);
+    return vehicles.where((vehicle) {
+      final matchesSearch =
+          query.isEmpty ||
+          vehicle.vehicleNumber.toLowerCase().contains(query) ||
+          vehicle.ticketNumber.toLowerCase().contains(query);
 
-        final matchesCategory =
-            _selectedCategory == 'All' ||
-                vehicle.category.toLowerCase() ==
-                    _selectedCategory.toLowerCase();
+      final matchesCategory =
+          _selectedCategory == 'All' ||
+          vehicle.category.toLowerCase() == _selectedCategory.toLowerCase();
 
-        return matchesSearch && matchesCategory;
-      },
-    ).toList();
+      return matchesSearch && matchesCategory;
+    }).toList();
   }
 
   // ===========================================================================
@@ -203,68 +188,58 @@ class _CaroutScreenState extends State<CaroutScreen> {
           : _activeVehiclesStream == null
           ? _buildLoading(theme)
           : StreamBuilder<List<_Vehicle>>(
-        stream: _activeVehiclesStream!,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _buildFirestoreError(
-              theme,
-              snapshot.error.toString(),
-            );
-          }
+              stream: _activeVehiclesStream!,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return _buildFirestoreError(theme, snapshot.error.toString());
+                }
 
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return _buildLoading(theme);
-          }
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return _buildLoading(theme);
+                }
 
-          final allVehicles = snapshot.data ?? [];
+                final allVehicles = snapshot.data ?? [];
 
-          final filteredVehicles = _filterVehicles(
-            allVehicles,
-          );
+                final filteredVehicles = _filterVehicles(allVehicles);
 
-          final selectedVehicle = _getSelectedVehicle(
-            allVehicles,
-          );
+                final selectedVehicle = _getSelectedVehicle(allVehicles);
 
-          // If the selected ticket disappeared from Firestore,
-          // clear the selection.
-          if (_selectedVehicleId != null &&
-              selectedVehicle == null) {
-            WidgetsBinding.instance.addPostFrameCallback(
-                  (_) {
-                if (mounted) {
-                  setState(() {
-                    _selectedVehicleId = null;
+                // If the selected ticket disappeared from Firestore,
+                // clear the selection.
+                if (_selectedVehicleId != null && selectedVehicle == null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        _selectedVehicleId = null;
+                      });
+                    }
                   });
                 }
-              },
-            );
-          }
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 900;
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 900;
 
-              if (isCompact) {
-                return _buildCompactLayout(
-                  theme,
-                  allVehicles,
-                  filteredVehicles,
-                  selectedVehicle,
+                    if (isCompact) {
+                      return _buildCompactLayout(
+                        theme,
+                        allVehicles,
+                        filteredVehicles,
+                        selectedVehicle,
+                      );
+                    }
+
+                    return _buildDesktopLayout(
+                      theme,
+                      allVehicles,
+                      filteredVehicles,
+                      selectedVehicle,
+                    );
+                  },
                 );
-              }
-
-              return _buildDesktopLayout(
-                theme,
-                allVehicles,
-                filteredVehicles,
-                selectedVehicle,
-              );
-            },
-          );
-        },
-      ),
+              },
+            ),
     );
   }
 
@@ -283,16 +258,12 @@ class _CaroutScreenState extends State<CaroutScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(
-                  color: colorScheme.primary,
-                ),
+                CircularProgressIndicator(color: colorScheme.primary),
                 const SizedBox(height: 15),
                 Text(
                   'Loading parked vehicles...',
                   style: TextStyle(
-                    color: colorScheme.onSurface.withValues(
-                      alpha: 0.55,
-                    ),
+                    color: colorScheme.onSurface.withValues(alpha: 0.55),
                     fontSize: 13,
                   ),
                 ),
@@ -330,10 +301,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   const Text(
                     'Unable to determine operator location',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -363,10 +331,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // FIRESTORE ERROR
   // ===========================================================================
 
-  Widget _buildFirestoreError(
-      ThemeData theme,
-      String error,
-      ) {
+  Widget _buildFirestoreError(ThemeData theme, String error) {
     final colorScheme = theme.colorScheme;
 
     return Column(
@@ -387,10 +352,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   const SizedBox(height: 15),
                   const Text(
                     'Unable to load parking tickets',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -398,9 +360,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
-                      color: colorScheme.onSurface.withValues(
-                        alpha: 0.55,
-                      ),
+                      color: colorScheme.onSurface.withValues(alpha: 0.55),
                     ),
                   ),
                 ],
@@ -417,17 +377,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Widget _buildDesktopLayout(
-      ThemeData theme,
-      List<_Vehicle> allVehicles,
-      List<_Vehicle> filteredVehicles,
-      _Vehicle? selectedVehicle,
-      ) {
+    ThemeData theme,
+    List<_Vehicle> allVehicles,
+    List<_Vehicle> filteredVehicles,
+    _Vehicle? selectedVehicle,
+  ) {
     return Column(
       children: [
-        _buildHeader(
-          theme,
-          allVehicles.length,
-        ),
+        _buildHeader(theme, allVehicles.length),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -448,10 +405,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   child: selectedVehicle == null
                       ? _buildSelectVehicleState(theme)
                       : _buildCheckoutPanel(
-                    theme,
-                    selectedVehicle,
-                    compact: false,
-                  ),
+                          theme,
+                          selectedVehicle,
+                          compact: false,
+                        ),
                 ),
               ],
             ),
@@ -466,17 +423,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Widget _buildCompactLayout(
-      ThemeData theme,
-      List<_Vehicle> allVehicles,
-      List<_Vehicle> filteredVehicles,
-      _Vehicle? selectedVehicle,
-      ) {
+    ThemeData theme,
+    List<_Vehicle> allVehicles,
+    List<_Vehicle> filteredVehicles,
+    _Vehicle? selectedVehicle,
+  ) {
     return Column(
       children: [
-        _buildHeader(
-          theme,
-          allVehicles.length,
-        ),
+        _buildHeader(theme, allVehicles.length),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(14),
@@ -489,16 +443,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
                 ),
                 const SizedBox(height: 14),
                 if (selectedVehicle == null)
-                  SizedBox(
-                    height: 400,
-                    child: _buildSelectVehicleState(theme),
-                  )
+                  SizedBox(height: 400, child: _buildSelectVehicleState(theme))
                 else
-                  _buildCheckoutPanel(
-                    theme,
-                    selectedVehicle,
-                    compact: true,
-                  ),
+                  _buildCheckoutPanel(theme, selectedVehicle, compact: true),
               ],
             ),
           ),
@@ -511,26 +458,16 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // HEADER
   // ===========================================================================
 
-  Widget _buildHeader(
-      ThemeData theme,
-      int activeCount,
-      ) {
+  Widget _buildHeader(ThemeData theme, int activeCount) {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        22,
-        18,
-        22,
-        18,
-      ),
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: colorScheme.outline.withValues(
-              alpha: 0.12,
-            ),
+            color: colorScheme.outline.withValues(alpha: 0.12),
           ),
         ),
       ),
@@ -540,9 +477,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(
-                alpha: 0.10,
-              ),
+              color: colorScheme.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
@@ -569,44 +504,27 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   'Find a parked vehicle and complete its checkout',
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: colorScheme.onSurface.withValues(
-                      alpha: 0.55,
-                    ),
+                    color: colorScheme.onSurface.withValues(alpha: 0.55),
                   ),
                 ),
               ],
             ),
           ),
-          _buildActiveCount(
-            theme,
-            activeCount,
-          ),
+          _buildActiveCount(theme, activeCount),
         ],
       ),
     );
   }
 
-  Widget _buildActiveCount(
-      ThemeData theme,
-      int count,
-      ) {
+  Widget _buildActiveCount(ThemeData theme, int count) {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 13,
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(
-          alpha: 0.08,
-        ),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: colorScheme.primary.withValues(
-            alpha: 0.12,
-          ),
-        ),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -647,31 +565,22 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Widget _buildVehicleSelectionPanel(
-      ThemeData theme,
-      List<_Vehicle> vehicles, {
-        required bool compact,
-      }) {
+    ThemeData theme,
+    List<_Vehicle> vehicles, {
+    required bool compact,
+  }) {
     final colorScheme = theme.colorScheme;
 
     final panel = Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outline.withValues(
-            alpha: 0.13,
-          ),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.13)),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              18,
-              18,
-              18,
-              12,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
             child: Column(
               children: [
                 Row(
@@ -690,9 +599,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface.withValues(
-                          alpha: 0.45,
-                        ),
+                        color: colorScheme.onSurface.withValues(alpha: 0.45),
                       ),
                     ),
                   ],
@@ -707,45 +614,34 @@ class _CaroutScreenState extends State<CaroutScreen> {
                         _searchQuery = value;
                       });
                     },
-                    textCapitalization:
-                    TextCapitalization.characters,
+                    textCapitalization: TextCapitalization.characters,
                     decoration: InputDecoration(
-                      hintText:
-                      'Search vehicle number or ticket...',
+                      hintText: 'Search vehicle number or ticket...',
                       prefixIcon: Icon(
                         Icons.search_rounded,
                         size: 20,
-                        color: colorScheme.onSurface.withValues(
-                          alpha: 0.45,
-                        ),
+                        color: colorScheme.onSurface.withValues(alpha: 0.45),
                       ),
-                      suffixIcon:
-                      _searchQuery.isNotEmpty
+                      suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
+                              onPressed: () {
+                                _searchController.clear();
 
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          size: 18,
-                        ),
-                      )
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                              },
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                            )
                           : null,
                       filled: true,
-                      fillColor:
-                      colorScheme.surfaceContainerHighest,
+                      fillColor: colorScheme.surfaceContainerHighest,
                       border: OutlineInputBorder(
-                        borderRadius:
-                        BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                        BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(
                           color: colorScheme.primary,
                           width: 1.3,
@@ -771,45 +667,37 @@ class _CaroutScreenState extends State<CaroutScreen> {
           ),
           Divider(
             height: 1,
-            color: colorScheme.outline.withValues(
-              alpha: 0.10,
-            ),
+            color: colorScheme.outline.withValues(alpha: 0.10),
           ),
           Expanded(
             child: vehicles.isEmpty
                 ? _buildNoVehiclesFound(theme)
                 : ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: vehicles.length,
-              separatorBuilder: (_, __) =>
-              const SizedBox(height: 7),
-              itemBuilder: (context, index) {
-                final vehicle = vehicles[index];
+                    padding: const EdgeInsets.all(12),
+                    itemCount: vehicles.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 7),
+                    itemBuilder: (context, index) {
+                      final vehicle = vehicles[index];
 
-                return _VehicleCard(
-                  vehicle: vehicle,
-                  selected:
-                  _selectedVehicleId ==
-                      vehicle.id,
-                  onTap: () {
-                    setState(() {
-                      _selectedVehicleId =
-                          vehicle.id;
-                    });
-                  },
-                );
-              },
-            ),
+                      return _VehicleCard(
+                        vehicle: vehicle,
+                        selected: _selectedVehicleId == vehicle.id,
+                        onTap: () {
+                          setState(() {
+                            _selectedVehicleId = vehicle.id;
+                            _notesController.text = vehicle.notes;
+                          });
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
 
     if (compact) {
-      return SizedBox(
-        height: 500,
-        child: panel,
-      );
+      return SizedBox(height: 500, child: panel);
     }
 
     return panel;
@@ -819,14 +707,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // CATEGORY CHIP
   // ===========================================================================
 
-  Widget _categoryChip(
-      ThemeData theme,
-      String category,
-      ) {
+  Widget _categoryChip(ThemeData theme, String category) {
     final colorScheme = theme.colorScheme;
 
-    final selected =
-        _selectedCategory == category;
+    final selected = _selectedCategory == category;
 
     return Padding(
       padding: const EdgeInsets.only(right: 7),
@@ -842,31 +726,18 @@ class _CaroutScreenState extends State<CaroutScreen> {
         side: BorderSide(
           color: selected
               ? colorScheme.primary
-              : colorScheme.outline.withValues(
-            alpha: 0.15,
-          ),
+              : colorScheme.outline.withValues(alpha: 0.15),
         ),
         backgroundColor: colorScheme.surface,
-        selectedColor:
-        colorScheme.primary.withValues(
-          alpha: 0.10,
-        ),
+        selectedColor: colorScheme.primary.withValues(alpha: 0.10),
         labelStyle: TextStyle(
           fontSize: 11.5,
-          fontWeight:
-          selected
-              ? FontWeight.w800
-              : FontWeight.w600,
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
           color: selected
               ? colorScheme.primary
-              : colorScheme.onSurface.withValues(
-            alpha: 0.60,
-          ),
+              : colorScheme.onSurface.withValues(alpha: 0.60),
         ),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 5,
-          vertical: 2,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       ),
     );
   }
@@ -885,21 +756,17 @@ class _CaroutScreenState extends State<CaroutScreen> {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
 
-        final duration =
-        vehicle.startTime == null
+        final duration = vehicle.startTime == null
             ? '--'
-            : _calculateDuration(
-          vehicle.startTime!,
-        );
+            : _calculateDuration(vehicle.startTime!);
 
-        final currentCharge =
-        vehicle.startTime == null
+        final currentCharge = vehicle.startTime == null
             ? 0.0
             : _calculateParkingCharge(
-          vehicle.startTime!,
-          vehicle.parkingCharges,
-          vehicle.graceTimeSeconds,
-        );
+                vehicle.startTime!,
+                vehicle.parkingCharges,
+                vehicle.graceTimeSeconds,
+              );
 
         return Material(
           color: Colors.transparent,
@@ -907,23 +774,17 @@ class _CaroutScreenState extends State<CaroutScreen> {
             onTap: onTap,
             borderRadius: BorderRadius.circular(12),
             child: AnimatedContainer(
-              duration:
-              const Duration(milliseconds: 180),
+              duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: selected
-                    ? colorScheme.primary.withValues(
-                  alpha: 0.055,
-                )
+                    ? colorScheme.primary.withValues(alpha: 0.055)
                     : colorScheme.surface,
-                borderRadius:
-                BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: selected
-                      ? colorScheme.primary
-                      .withValues(alpha: 0.45)
-                      : colorScheme.outline
-                      .withValues(alpha: 0.13),
+                      ? colorScheme.primary.withValues(alpha: 0.45)
+                      : colorScheme.outline.withValues(alpha: 0.13),
                   width: selected ? 1.4 : 1,
                 ),
               ),
@@ -933,17 +794,11 @@ class _CaroutScreenState extends State<CaroutScreen> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color:
-                      colorScheme.primary.withValues(
-                        alpha: 0.09,
-                      ),
-                      borderRadius:
-                      BorderRadius.circular(11),
+                      color: colorScheme.primary.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(11),
                     ),
                     child: Icon(
-                      _categoryIcon(
-                        vehicle.category,
-                      ),
+                      _categoryIcon(vehicle.category),
                       size: 22,
                       color: colorScheme.primary,
                     ),
@@ -951,45 +806,34 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   const SizedBox(width: 11),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             Flexible(
                               child: Text(
                                 vehicle.vehicleNumber,
-                                overflow:
-                                TextOverflow.ellipsis,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 15,
-                                  fontWeight:
-                                  FontWeight.w800,
+                                  fontWeight: FontWeight.w800,
                                   letterSpacing: .4,
-                                  color:
-                                  colorScheme
-                                      .onSurface,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 7),
-                            _smallCategoryBadge(
-                              context,
-                              vehicle.category,
-                            ),
+                            _smallCategoryBadge(context, vehicle.category),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${vehicle.ticketNumber}  •  ${vehicle.location}',
                           maxLines: 1,
-                          overflow:
-                          TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
-                            color:
-                            colorScheme.onSurface
-                                .withValues(
+                            color: colorScheme.onSurface.withValues(
                               alpha: 0.52,
                             ),
                           ),
@@ -999,28 +843,23 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   ),
                   const SizedBox(width: 10),
                   Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Row(
-                        mainAxisSize:
-                        MainAxisSize.min,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.timer_outlined,
                             size: 14,
-                            color:
-                            colorScheme.primary,
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             duration,
                             style: TextStyle(
                               fontSize: 11.5,
-                              fontWeight:
-                              FontWeight.w800,
-                              color:
-                              colorScheme.primary,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.primary,
                             ),
                           ),
                         ],
@@ -1030,13 +869,8 @@ class _CaroutScreenState extends State<CaroutScreen> {
                         'Rs. ${currentCharge.toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 10.5,
-                          fontWeight:
-                          FontWeight.w800,
-                          color:
-                          colorScheme.onSurface
-                              .withValues(
-                            alpha: 0.55,
-                          ),
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface.withValues(alpha: 0.55),
                         ),
                       ),
                     ],
@@ -1044,17 +878,12 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   const SizedBox(width: 7),
                   Icon(
                     selected
-                        ? Icons
-                        .check_circle_rounded
-                        : Icons
-                        .chevron_right_rounded,
+                        ? Icons.check_circle_rounded
+                        : Icons.chevron_right_rounded,
                     size: selected ? 20 : 19,
                     color: selected
                         ? colorScheme.primary
-                        : colorScheme.onSurface
-                        .withValues(
-                      alpha: 0.25,
-                    ),
+                        : colorScheme.onSurface.withValues(alpha: 0.25),
                   ),
                 ],
               ),
@@ -1065,22 +894,13 @@ class _CaroutScreenState extends State<CaroutScreen> {
     );
   }
 
-  Widget _smallCategoryBadge(
-      BuildContext context,
-      String category,
-      ) {
-    final colorScheme =
-        Theme.of(context).colorScheme;
+  Widget _smallCategoryBadge(BuildContext context, String category) {
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 6,
-        vertical: 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(
-          alpha: 0.08,
-        ),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(
@@ -1113,20 +933,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // EMPTY RIGHT PANEL
   // ===========================================================================
 
-  Widget _buildSelectVehicleState(
-      ThemeData theme,
-      ) {
+  Widget _buildSelectVehicleState(ThemeData theme) {
     final colorScheme = theme.colorScheme;
 
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outline.withValues(
-            alpha: 0.13,
-          ),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.13)),
       ),
       child: Center(
         child: Padding(
@@ -1138,21 +952,13 @@ class _CaroutScreenState extends State<CaroutScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color:
-                  colorScheme.primary.withValues(
-                    alpha: 0.08,
-                  ),
-                  borderRadius:
-                  BorderRadius.circular(20),
+                  color: colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(
-                  Icons
-                      .directions_car_filled_rounded,
+                  Icons.directions_car_filled_rounded,
                   size: 34,
-                  color:
-                  colorScheme.primary.withValues(
-                    alpha: 0.75,
-                  ),
+                  color: colorScheme.primary.withValues(alpha: 0.75),
                 ),
               ),
               const SizedBox(height: 18),
@@ -1167,15 +973,12 @@ class _CaroutScreenState extends State<CaroutScreen> {
               const SizedBox(height: 6),
               Text(
                 'Choose a vehicle from the list to review\n'
-                    'its parking time and checkout amount.',
+                'its parking time and checkout amount.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.5,
-                  color:
-                  colorScheme.onSurface.withValues(
-                    alpha: 0.52,
-                  ),
+                  color: colorScheme.onSurface.withValues(alpha: 0.52),
                 ),
               ),
             ],
@@ -1190,10 +993,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Widget _buildCheckoutPanel(
-      ThemeData theme,
-      _Vehicle vehicle, {
-        required bool compact,
-      }) {
+    ThemeData theme,
+    _Vehicle vehicle, {
+    required bool compact,
+  }) {
     final colorScheme = theme.colorScheme;
 
     final startTime = vehicle.startTime;
@@ -1205,8 +1008,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
       );
     }
 
-    final duration =
-    _calculateDuration(startTime);
+    final duration = _calculateDuration(startTime);
 
     final price = _calculateParkingCharge(
       startTime,
@@ -1218,38 +1020,23 @@ class _CaroutScreenState extends State<CaroutScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outline.withValues(
-            alpha: 0.13,
-          ),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.13)),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              18,
-              18,
-              18,
-              15,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 15),
             child: Row(
               children: [
                 Container(
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color:
-                    colorScheme.primary.withValues(
-                      alpha: 0.10,
-                    ),
-                    borderRadius:
-                    BorderRadius.circular(13),
+                    color: colorScheme.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(
-                    _categoryIcon(
-                      vehicle.category,
-                    ),
+                    _categoryIcon(vehicle.category),
                     color: colorScheme.primary,
                     size: 25,
                   ),
@@ -1257,18 +1044,15 @@ class _CaroutScreenState extends State<CaroutScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         vehicle.vehicleNumber,
                         style: TextStyle(
                           fontSize: 19,
-                          fontWeight:
-                          FontWeight.w900,
+                          fontWeight: FontWeight.w900,
                           letterSpacing: .5,
-                          color:
-                          colorScheme.onSurface,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -1276,11 +1060,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                         '${vehicle.category}  •  ${vehicle.location}',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: colorScheme
-                              .onSurface
-                              .withValues(
-                            alpha: 0.52,
-                          ),
+                          color: colorScheme.onSurface.withValues(alpha: 0.52),
                         ),
                       ),
                     ],
@@ -1293,124 +1073,121 @@ class _CaroutScreenState extends State<CaroutScreen> {
                       _selectedVehicleId = null;
                     });
                   },
-                  icon: const Icon(
-                    Icons.swap_horiz_rounded,
-                  ),
+                  icon: const Icon(Icons.swap_horiz_rounded),
                 ),
               ],
             ),
           ),
           Divider(
             height: 1,
-            color: colorScheme.outline.withValues(
-              alpha: 0.10,
-            ),
+            color: colorScheme.outline.withValues(alpha: 0.10),
           ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(18),
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildParkingSummary(
-                    theme,
-                    vehicle,
-                    duration,
-                  ),
+                  _buildParkingSummary(theme, vehicle, duration),
                   const SizedBox(height: 18),
                   Text(
                     'Parking Charges',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color:
-                      colorScheme.onSurface,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 9),
-                  _buildChargeCard(
-                    theme,
-                    vehicle,
-                    price,
-                    duration,
-                  ),
+                  _buildChargeCard(theme, vehicle, price, duration),
                   const SizedBox(height: 18),
                   Text(
                     'Ticket Information',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color:
-                      colorScheme.onSurface,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 9),
-                  _infoCard(
-                    theme,
-                    [
-                      _infoRow(
-                        theme,
-                        Icons
-                            .receipt_long_outlined,
-                        'Ticket',
-                        vehicle.ticketNumber,
-                      ),
-                      _infoRow(
-                        theme,
-                        Icons.login_outlined,
-                        'Started',
-                        _formatDateTime(
-                          startTime,
-                        ),
-                      ),
-                      _infoRow(
-                        theme,
-                        Icons.location_on_outlined,
-                        'Location',
-                        vehicle.location,
-                      ),
-                      _infoRow(
-                        theme,
-                        Icons
-                            .person_outline_rounded,
-                        'Driver',
-                        vehicle.driverName
-                            .isEmpty
-                            ? '--'
-                            : vehicle.driverName,
-                      ),
-                      _infoRow(
-                        theme,
-                        Icons.phone_outlined,
-                        'Phone',
-                        vehicle.phoneNumber
-                            .isEmpty
-                            ? '--'
-                            : vehicle.phoneNumber,
-                      ),
-                    ],
+                  _infoCard(theme, [
+                    _infoRow(
+                      theme,
+                      Icons.receipt_long_outlined,
+                      'Ticket',
+                      vehicle.ticketNumber,
+                    ),
+                    _infoRow(
+                      theme,
+                      Icons.login_outlined,
+                      'Started',
+                      _formatDateTime(startTime),
+                    ),
+                    _infoRow(
+                      theme,
+                      Icons.location_on_outlined,
+                      'Location',
+                      vehicle.location,
+                    ),
+                    _infoRow(
+                      theme,
+                      Icons.person_outline_rounded,
+                      'Driver',
+                      vehicle.driverName.isEmpty ? '--' : vehicle.driverName,
+                    ),
+                    _infoRow(
+                      theme,
+                      Icons.phone_outlined,
+                      'Phone',
+                      vehicle.phoneNumber.isEmpty ? '--' : vehicle.phoneNumber,
+                    ),
+                  ]),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Notes',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  TextField(
+                    controller: _notesController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'Add vehicle notes',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton.icon(
+                      onPressed: _savingNotes
+                          ? null
+                          : () => _saveVehicleNotes(vehicle),
+                      icon: _savingNotes
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined, size: 18),
+                      label: Text(_savingNotes ? 'Saving…' : 'Save Notes'),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           Container(
-            padding:
-            const EdgeInsets.fromLTRB(
-              18,
-              12,
-              18,
-              18,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
             decoration: BoxDecoration(
               color: colorScheme.surface,
               border: Border(
                 top: BorderSide(
-                  color: colorScheme.outline
-                      .withValues(
-                    alpha: 0.10,
-                  ),
+                  color: colorScheme.outline.withValues(alpha: 0.10),
                 ),
               ),
             ),
@@ -1419,16 +1196,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: () {
-                  _showConfirmDialog(
-                    context,
-                    vehicle,
-                    price,
-                  );
+                  _showConfirmDialog(context, vehicle, price);
                 },
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  size: 19,
-                ),
+                icon: const Icon(Icons.logout_rounded, size: 19),
                 label: Text(
                   'Complete Car Out • Rs. ${price.toStringAsFixed(0)}',
                   style: const TextStyle(
@@ -1437,14 +1207,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   ),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor:
-                  colorScheme.primary,
-                  foregroundColor:
-                  colorScheme.onPrimary,
-                  shape:
-                  RoundedRectangleBorder(
-                    borderRadius:
-                    BorderRadius.circular(10),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
@@ -1455,13 +1221,29 @@ class _CaroutScreenState extends State<CaroutScreen> {
     );
 
     if (compact) {
-      return SizedBox(
-        height: 650,
-        child: panel,
-      );
+      return SizedBox(height: 650, child: panel);
     }
 
     return panel;
+  }
+
+  Future<void> _saveVehicleNotes(_Vehicle vehicle) async {
+    setState(() => _savingNotes = true);
+    try {
+      await _firestore.collection('parking_tickets').doc(vehicle.id).update({
+        'notes': _notesController.text.trim(),
+      });
+      if (mounted)
+        AppToast.success(
+          context,
+          'Notes updated',
+          'Changes saved for ${vehicle.vehicleNumber}.',
+        );
+    } catch (e) {
+      if (mounted) AppToast.error(context, 'Could not save notes', '$e');
+    } finally {
+      if (mounted) setState(() => _savingNotes = false);
+    }
   }
 
   // ===========================================================================
@@ -1469,15 +1251,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Widget _buildChargeCard(
-      ThemeData theme,
-      _Vehicle vehicle,
-      double price,
-      String duration,
-      ) {
+    ThemeData theme,
+    _Vehicle vehicle,
+    double price,
+    String duration,
+  ) {
     final colorScheme = theme.colorScheme;
 
-    final billingPeriods =
-    _billingPeriods(
+    final billingPeriods = _billingPeriods(
       vehicle.startTime!,
       vehicle.graceTimeSeconds,
     );
@@ -1485,14 +1266,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:
-        colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outline.withValues(
-            alpha: 0.10,
-          ),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.10)),
       ),
       child: Column(
         children: [
@@ -1500,18 +1276,12 @@ class _CaroutScreenState extends State<CaroutScreen> {
           _chargeRow(
             theme,
             'Location grace time',
-            _formatGraceTime(
-              vehicle.graceTimeSeconds,
-            ),
+            _formatGraceTime(vehicle.graceTimeSeconds),
           ),
 
           const SizedBox(height: 9),
 
-          _chargeRow(
-            theme,
-            'Parking duration',
-            duration,
-          ),
+          _chargeRow(theme, 'Parking duration', duration),
 
           const SizedBox(height: 9),
 
@@ -1524,27 +1294,17 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
           const SizedBox(height: 9),
 
-          _chargeRow(
-            theme,
-            'Extra grace after charge',
-            '15 min',
-          ),
+          _chargeRow(theme, 'Extra grace after charge', '15 min'),
 
           const SizedBox(height: 9),
 
-          _chargeRow(
-            theme,
-            'Billing periods',
-            billingPeriods.toString(),
-          ),
+          _chargeRow(theme, 'Billing periods', billingPeriods.toString()),
 
           const SizedBox(height: 13),
 
           Divider(
             height: 1,
-            color: colorScheme.outline.withValues(
-              alpha: 0.13,
-            ),
+            color: colorScheme.outline.withValues(alpha: 0.13),
           ),
 
           const SizedBox(height: 13),
@@ -1580,39 +1340,26 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Widget _buildParkingSummary(
-      ThemeData theme,
-      _Vehicle vehicle,
-      String duration,
-      ) {
+    ThemeData theme,
+    _Vehicle vehicle,
+    String duration,
+  ) {
     final colorScheme = theme.colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:
-        colorScheme.primary.withValues(
-          alpha: 0.055,
-        ),
+        color: colorScheme.primary.withValues(alpha: 0.055),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color:
-          colorScheme.primary.withValues(
-            alpha: 0.13,
-          ),
-        ),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.13)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.timer_outlined,
-            color: colorScheme.primary,
-            size: 24,
-          ),
+          Icon(Icons.timer_outlined, color: colorScheme.primary, size: 24),
           const SizedBox(width: 11),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'PARKED FOR',
@@ -1620,11 +1367,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
                     letterSpacing: .7,
-                    color:
-                    colorScheme.primary
-                        .withValues(
-                      alpha: 0.70,
-                    ),
+                    color: colorScheme.primary.withValues(alpha: 0.70),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1633,16 +1376,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color:
-                    colorScheme.onSurface,
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
           ),
           Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 'GRACE TIME',
@@ -1650,27 +1391,17 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   fontSize: 9,
                   fontWeight: FontWeight.w800,
                   letterSpacing: .7,
-                  color:
-                  colorScheme.onSurface
-                      .withValues(
-                    alpha: 0.40,
-                  ),
+                  color: colorScheme.onSurface.withValues(alpha: 0.40),
                 ),
               ),
               const SizedBox(height: 3),
               Text(
-                _formatGraceTime(
-                  vehicle.graceTimeSeconds,
-                ),
+                _formatGraceTime(vehicle.graceTimeSeconds),
                 textAlign: TextAlign.end,
                 style: TextStyle(
                   fontSize: 10.5,
                   fontWeight: FontWeight.w700,
-                  color:
-                  colorScheme.onSurface
-                      .withValues(
-                    alpha: 0.65,
-                  ),
+                  color: colorScheme.onSurface.withValues(alpha: 0.65),
                 ),
               ),
             ],
@@ -1685,10 +1416,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   void _showConfirmDialog(
-      BuildContext context,
-      _Vehicle vehicle,
-      double displayedPrice,
-      ) {
+    BuildContext context,
+    _Vehicle vehicle,
+    double displayedPrice,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1699,66 +1430,46 @@ class _CaroutScreenState extends State<CaroutScreen> {
       barrierDismissible: false,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (
-              context,
-              setDialogState,
-              ) {
+          builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text(
                 'Confirm Car Out',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'This will complete the checkout and archive the ticket.',
                     style: TextStyle(
                       fontSize: 13,
-                      color:
-                      colorScheme.onSurface
-                          .withValues(
-                        alpha: 0.65,
-                      ),
+                      color: colorScheme.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
                   const SizedBox(height: 18),
                   Container(
                     width: double.infinity,
-                    padding:
-                    const EdgeInsets.all(13),
+                    padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary
-                          .withValues(
-                        alpha: 0.07,
-                      ),
-                      borderRadius:
-                      BorderRadius.circular(10),
+                      color: colorScheme.primary.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
                       children: [
                         Row(
                           children: [
                             Icon(
-                              Icons
-                                  .directions_car_rounded,
-                              color:
-                              colorScheme.primary,
+                              Icons.directions_car_rounded,
+                              color: colorScheme.primary,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                vehicle
-                                    .vehicleNumber,
-                                style:
-                                const TextStyle(
+                                vehicle.vehicleNumber,
+                                style: const TextStyle(
                                   fontSize: 16,
-                                  fontWeight:
-                                  FontWeight.w900,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ),
@@ -1766,11 +1477,8 @@ class _CaroutScreenState extends State<CaroutScreen> {
                               'Rs. ${displayedPrice.toStringAsFixed(0)}',
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight:
-                                FontWeight.w900,
-                                color:
-                                colorScheme
-                                    .primary,
+                                fontWeight: FontWeight.w900,
+                                color: colorScheme.primary,
                               ),
                             ),
                           ],
@@ -1783,10 +1491,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                                 'Grace: ${_formatGraceTime(vehicle.graceTimeSeconds)}',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color:
-                                  colorScheme
-                                      .onSurface
-                                      .withValues(
+                                  color: colorScheme.onSurface.withValues(
                                     alpha: 0.55,
                                   ),
                                 ),
@@ -1796,10 +1501,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                               'Ticket: ${vehicle.ticketNumber}',
                               style: TextStyle(
                                 fontSize: 10.5,
-                                color:
-                                colorScheme
-                                    .onSurface
-                                    .withValues(
+                                color: colorScheme.onSurface.withValues(
                                   alpha: 0.55,
                                 ),
                               ),
@@ -1816,59 +1518,40 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   onPressed: isProcessing
                       ? null
                       : () {
-                    Navigator.pop(
-                      dialogContext,
-                    );
-                  },
+                          Navigator.pop(dialogContext);
+                        },
                   child: const Text('Cancel'),
                 ),
                 FilledButton.icon(
                   onPressed: isProcessing
                       ? null
                       : () async {
-                    setDialogState(() {
-                      isProcessing = true;
-                    });
+                          setDialogState(() {
+                            isProcessing = true;
+                          });
 
-                    try {
-                      await _completeCarOut(
-                        vehicle,
-                      );
+                          try {
+                            await _completeCarOut(vehicle);
 
-                      if (dialogContext
-                          .mounted) {
-                        Navigator.pop(
-                          dialogContext,
-                        );
-                      }
-                    } catch (e) {
-                      if (dialogContext
-                          .mounted) {
-                        setDialogState(() {
-                          isProcessing =
-                          false;
-                        });
-                      }
-                    }
-                  },
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (e) {
+                            if (dialogContext.mounted) {
+                              setDialogState(() {
+                                isProcessing = false;
+                              });
+                            }
+                          }
+                        },
                   icon: isProcessing
                       ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Icon(
-                    Icons.check_rounded,
-                    size: 18,
-                  ),
-                  label: Text(
-                    isProcessing
-                        ? 'Processing...'
-                        : 'Confirm',
-                  ),
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_rounded, size: 18),
+                  label: Text(isProcessing ? 'Processing...' : 'Confirm'),
                 ),
               ],
             );
@@ -1890,204 +1573,161 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // If anything fails, Firestore rolls back the transaction.
   // ===========================================================================
 
-  Future<void> _completeCarOut(
-      _Vehicle vehicle,
-      ) async {
+  Future<void> _completeCarOut(_Vehicle vehicle) async {
     final originalRef = _firestore
         .collection('parking_tickets')
         .doc(vehicle.id);
 
     try {
-      await _firestore.runTransaction(
-            (transaction) async {
-          // --------------------------------------------------------------
-          // READ ORIGINAL ACTIVE TICKET
-          // --------------------------------------------------------------
+      await _firestore.runTransaction((transaction) async {
+        // --------------------------------------------------------------
+        // READ ORIGINAL ACTIVE TICKET
+        // --------------------------------------------------------------
 
-          final originalSnapshot =
-          await transaction.get(
-            originalRef,
+        final originalSnapshot = await transaction.get(originalRef);
+
+        if (!originalSnapshot.exists) {
+          throw Exception('This parking ticket no longer exists.');
+        }
+
+        final originalData = originalSnapshot.data();
+
+        if (originalData == null) {
+          throw Exception('Parking ticket contains no data.');
+        }
+
+        final ticketLocationId = originalData['locationId']?.toString();
+        if (_userLocationId == null || ticketLocationId != _userLocationId) {
+          throw Exception(
+            'A vehicle can only be checked out at a gate in its entry location.',
           );
+        }
 
-          if (!originalSnapshot.exists) {
-            throw Exception(
-              'This parking ticket no longer exists.',
-            );
-          }
+        // --------------------------------------------------------------
+        // CHECK STATUS
+        // --------------------------------------------------------------
 
-          final originalData =
-          originalSnapshot.data();
+        final currentStatus = originalData['status']?.toString().toLowerCase();
 
-          if (originalData == null) {
-            throw Exception(
-              'Parking ticket contains no data.',
-            );
-          }
+        if (currentStatus != 'in') {
+          throw Exception('This vehicle has already been checked out.');
+        }
 
-          final ticketLocationId = originalData['locationId']?.toString();
-          if (_userLocationId == null || ticketLocationId != _userLocationId) {
-            throw Exception(
-              'A vehicle can only be checked out at a gate in its entry location.',
-            );
-          }
+        // --------------------------------------------------------------
+        // START TIME
+        // --------------------------------------------------------------
 
-          // --------------------------------------------------------------
-          // CHECK STATUS
-          // --------------------------------------------------------------
+        final startTime = firestoreDate(originalData['startTime']);
 
-          final currentStatus =
-          originalData['status']
-              ?.toString()
-              .toLowerCase();
+        if (startTime == null) {
+          throw Exception('Ticket startTime is missing.');
+        }
 
-          if (currentStatus != 'in') {
-            throw Exception(
-              'This vehicle has already been checked out.',
-            );
-          }
+        // --------------------------------------------------------------
+        // GET PRICING FROM THE TICKET
+        //
+        // Do NOT use cached operator settings here.
+        //
+        // The ticket contains the pricing snapshot that was
+        // assigned when the car entered.
+        // --------------------------------------------------------------
 
-          // --------------------------------------------------------------
-          // START TIME
-          // --------------------------------------------------------------
+        final parkingCharge = firestoreDouble(originalData['parkingCharges']);
 
-          final startTime = firestoreDate(
-            originalData['startTime'],
-          );
+        final graceTimeSeconds = firestoreInt(originalData['graceTimeSeconds']);
 
-          if (startTime == null) {
-            throw Exception(
-              'Ticket startTime is missing.',
-            );
-          }
+        // --------------------------------------------------------------
+        // CHECKOUT TIME
+        // --------------------------------------------------------------
 
-          // --------------------------------------------------------------
-          // GET PRICING FROM THE TICKET
-          //
-          // Do NOT use cached operator settings here.
-          //
-          // The ticket contains the pricing snapshot that was
-          // assigned when the car entered.
-          // --------------------------------------------------------------
+        final checkoutTime = DateTime.now();
 
-          final parkingCharge =
-          firestoreDouble(
-            originalData['parkingCharges'],
-          );
+        // --------------------------------------------------------------
+        // CALCULATE FINAL AMOUNT
+        // --------------------------------------------------------------
 
-          final graceTimeSeconds =
-          firestoreInt(
-            originalData['graceTimeSeconds'],
-          );
+        final finalCharge = _calculateParkingChargeAtTime(
+          startTime,
+          parkingCharge,
+          graceTimeSeconds,
+          checkoutTime,
+        );
 
-          // --------------------------------------------------------------
-          // CHECKOUT TIME
-          // --------------------------------------------------------------
+        // --------------------------------------------------------------
+        // COPY ALL ORIGINAL DATA
+        // --------------------------------------------------------------
 
-          final checkoutTime = DateTime.now();
+        final backupData = Map<String, dynamic>.from(originalData);
 
-          // --------------------------------------------------------------
-          // CALCULATE FINAL AMOUNT
-          // --------------------------------------------------------------
+        // --------------------------------------------------------------
+        // Keep the original document id so reports can read completed
+        // tickets under the same location-scoped rules as active tickets.
+        // --------------------------------------------------------------
 
-          final finalCharge =
-          _calculateParkingChargeAtTime(
-            startTime,
-            parkingCharge,
-            graceTimeSeconds,
-            checkoutTime,
-          );
+        backupData['id'] = originalRef.id;
 
-          // --------------------------------------------------------------
-          // COPY ALL ORIGINAL DATA
-          // --------------------------------------------------------------
+        // --------------------------------------------------------------
+        // STATUS
+        // --------------------------------------------------------------
 
-          final backupData =
-          Map<String, dynamic>.from(
-            originalData,
-          );
+        backupData['status'] = 'out';
+        // Attribute the completed exit and collected revenue to the gate
+        // operator who processed it. Keep operatorId as the entry operator
+        // for compatibility with older screens and records.
+        backupData['entryOperatorId'] =
+            originalData['entryOperatorId'] ?? originalData['operatorId'] ?? '';
+        final cachedOpName = AppDataCache.instance.operatorName?.trim();
+        final exitOpName = (cachedOpName != null && cachedOpName.isNotEmpty)
+            ? cachedOpName
+            : (_auth.currentUser?.displayName ?? '');
+        backupData['exitOperatorId'] = _auth.currentUser?.uid ?? '';
+        backupData['exitOperatorName'] = exitOpName;
+        backupData['entryOperatorName'] =
+            originalData['entryOperatorName'] ?? '';
+        backupData['exitLocationId'] = _userLocationId ?? '';
 
-          // --------------------------------------------------------------
-          // Keep the original document id so reports can read completed
-          // tickets under the same location-scoped rules as active tickets.
-          // --------------------------------------------------------------
+        // --------------------------------------------------------------
+        // END TIME
+        // --------------------------------------------------------------
 
-          backupData['id'] = originalRef.id;
+        backupData['endTime'] = Timestamp.fromDate(checkoutTime);
 
-          // --------------------------------------------------------------
-          // STATUS
-          // --------------------------------------------------------------
+        backupData['checkoutCompletedAt'] = Timestamp.fromDate(checkoutTime);
 
-          backupData['status'] = 'out';
-          // Attribute the completed exit and collected revenue to the gate
-          // operator who processed it. Keep operatorId as the entry operator
-          // for compatibility with older screens and records.
-          backupData['entryOperatorId'] =
-              originalData['entryOperatorId'] ?? originalData['operatorId'] ?? '';
-          final cachedOpName = AppDataCache.instance.operatorName?.trim();
-          final exitOpName = (cachedOpName != null && cachedOpName.isNotEmpty)
-              ? cachedOpName
-              : (_auth.currentUser?.displayName ?? '');
-          backupData['exitOperatorId'] = _auth.currentUser?.uid ?? '';
-          backupData['exitOperatorName'] = exitOpName;
-          backupData['entryOperatorName'] =
-              originalData['entryOperatorName'] ?? '';
-          backupData['exitLocationId'] = _userLocationId ?? '';
+        // --------------------------------------------------------------
+        // FINAL AMOUNT
+        //
+        // Keep parkingCharges as the original base rate.
+        //
+        // Example:
+        //
+        // parkingCharges       = 500
+        // checkoutAmount       = 1000
+        // finalParkingCharges  = 1000
+        // --------------------------------------------------------------
 
-          // --------------------------------------------------------------
-          // END TIME
-          // --------------------------------------------------------------
+        backupData['checkoutAmount'] = finalCharge;
 
-          backupData['endTime'] =
-              Timestamp.fromDate(
-                checkoutTime,
-              );
+        // Keep the canonical amount populated for older reports and
+        // dashboard widgets that still read `charges` directly.
+        backupData['charges'] = finalCharge;
 
-          backupData['checkoutCompletedAt'] =
-              Timestamp.fromDate(
-                checkoutTime,
-              );
+        backupData['finalParkingCharges'] = finalCharge;
 
-          // --------------------------------------------------------------
-          // FINAL AMOUNT
-          //
-          // Keep parkingCharges as the original base rate.
-          //
-          // Example:
-          //
-          // parkingCharges       = 500
-          // checkoutAmount       = 1000
-          // finalParkingCharges  = 1000
-          // --------------------------------------------------------------
+        // --------------------------------------------------------------
+        // AUDIT
+        // --------------------------------------------------------------
 
-          backupData['checkoutAmount'] =
-              finalCharge;
+        backupData['backupCreatedAt'] = FieldValue.serverTimestamp();
 
-          // Keep the canonical amount populated for older reports and
-          // dashboard widgets that still read `charges` directly.
-          backupData['charges'] = finalCharge;
+        backupData['updatedAt'] = Timestamp.fromDate(checkoutTime);
 
-          backupData['finalParkingCharges'] =
-              finalCharge;
+        // --------------------------------------------------------------
+        // UPDATE ORIGINAL TICKET
+        // --------------------------------------------------------------
 
-          // --------------------------------------------------------------
-          // AUDIT
-          // --------------------------------------------------------------
-
-          backupData['backupCreatedAt'] =
-              FieldValue.serverTimestamp();
-
-          backupData['updatedAt'] =
-              Timestamp.fromDate(
-                checkoutTime,
-              );
-
-          // --------------------------------------------------------------
-          // UPDATE ORIGINAL TICKET
-          // --------------------------------------------------------------
-
-          transaction.set(originalRef, backupData);
-        },
-      );
+        transaction.set(originalRef, backupData);
+      });
 
       if (!mounted) {
         return;
@@ -2100,9 +1740,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
       _searchController.clear();
 
-      _showSuccess(
-        '${vehicle.vehicleNumber} checked out successfully.',
-      );
+      _showSuccess('${vehicle.vehicleNumber} checked out successfully.');
     } catch (e) {
       if (!mounted) {
         return;
@@ -2110,12 +1748,8 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
       String message = e.toString();
 
-      if (message.startsWith(
-        'Exception: ',
-      )) {
-        message = message.substring(
-          'Exception: '.length,
-        );
+      if (message.startsWith('Exception: ')) {
+        message = message.substring('Exception: '.length);
       }
 
       _showError(message);
@@ -2147,10 +1781,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   double _calculateParkingCharge(
-      DateTime startTime,
-      double parkingCharge,
-      int graceTimeSeconds,
-      ) {
+    DateTime startTime,
+    double parkingCharge,
+    int graceTimeSeconds,
+  ) {
     final liveGrace = AppDataCache.instance.graceTimeSeconds;
     final effectiveGrace = graceTimeSeconds > 0 ? graceTimeSeconds : liveGrace;
 
@@ -2163,17 +1797,16 @@ class _CaroutScreenState extends State<CaroutScreen> {
   }
 
   double _calculateParkingChargeAtTime(
-      DateTime startTime,
-      double parkingCharge,
-      int graceTimeSeconds,
-      DateTime endTime,
-      ) {
+    DateTime startTime,
+    double parkingCharge,
+    int graceTimeSeconds,
+    DateTime endTime,
+  ) {
     if (parkingCharge <= 0) {
       return 0;
     }
 
-    var elapsed =
-    endTime.difference(startTime);
+    var elapsed = endTime.difference(startTime);
 
     if (elapsed.isNegative) {
       elapsed = Duration.zero;
@@ -2183,8 +1816,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
     // LOCATION GRACE PERIOD
     // --------------------------------------------------------------
 
-    final gracePeriod =
-    Duration(seconds: graceTimeSeconds);
+    final gracePeriod = Duration(seconds: graceTimeSeconds);
 
     // Vehicle is still FREE.
     if (elapsed < gracePeriod) {
@@ -2195,11 +1827,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
     // FIRST CHARGE
     // --------------------------------------------------------------
 
-    const subsequentBillingWindow =
-    Duration(minutes: 45);
+    const subsequentBillingWindow = Duration(minutes: 45);
 
-    final timeAfterGrace =
-        elapsed - gracePeriod;
+    final timeAfterGrace = elapsed - gracePeriod;
 
     // Each additional charge occurs every:
     //
@@ -2207,12 +1837,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
     //
     // = 45 minutes.
     final additionalCharges =
-        timeAfterGrace.inSeconds ~/
-            subsequentBillingWindow.inSeconds;
+        timeAfterGrace.inSeconds ~/ subsequentBillingWindow.inSeconds;
 
     // First charge + additional charges.
-    final totalCharges =
-        1 + additionalCharges;
+    final totalCharges = 1 + additionalCharges;
 
     return parkingCharge * totalCharges;
   }
@@ -2221,34 +1849,26 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // BILLING PERIODS
   // ===========================================================================
 
-  int _billingPeriods(
-      DateTime startTime,
-      int graceTimeSeconds,
-      ) {
-    var elapsed =
-    DateTime.now().difference(startTime);
+  int _billingPeriods(DateTime startTime, int graceTimeSeconds) {
+    var elapsed = DateTime.now().difference(startTime);
 
     if (elapsed.isNegative) {
       elapsed = Duration.zero;
     }
 
-    final gracePeriod =
-    Duration(seconds: graceTimeSeconds);
+    final gracePeriod = Duration(seconds: graceTimeSeconds);
 
     // Still completely free.
     if (elapsed < gracePeriod) {
       return 0;
     }
 
-    const subsequentBillingWindow =
-    Duration(minutes: 45);
+    const subsequentBillingWindow = Duration(minutes: 45);
 
-    final timeAfterGrace =
-        elapsed - gracePeriod;
+    final timeAfterGrace = elapsed - gracePeriod;
 
     final additionalCharges =
-        timeAfterGrace.inSeconds ~/
-            subsequentBillingWindow.inSeconds;
+        timeAfterGrace.inSeconds ~/ subsequentBillingWindow.inSeconds;
 
     return 1 + additionalCharges;
   }
@@ -2257,11 +1877,8 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // DURATION
   // ===========================================================================
 
-  String _calculateDuration(
-      DateTime startTime,
-      ) {
-    var difference =
-    DateTime.now().difference(startTime);
+  String _calculateDuration(DateTime startTime) {
+    var difference = DateTime.now().difference(startTime);
 
     if (difference.isNegative) {
       difference = Duration.zero;
@@ -2269,11 +1886,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
     final days = difference.inDays;
 
-    final hours =
-        difference.inHours % 24;
+    final hours = difference.inHours % 24;
 
-    final minutes =
-        difference.inMinutes % 60;
+    final minutes = difference.inMinutes % 60;
 
     if (days > 0) {
       return '${days}d ${hours}h';
@@ -2290,20 +1905,16 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // GRACE TIME FORMAT
   // ===========================================================================
 
-  String _formatGraceTime(
-      int seconds,
-      ) {
+  String _formatGraceTime(int seconds) {
     if (seconds <= 0) {
       return 'No grace';
     }
 
-    final duration =
-    Duration(seconds: seconds);
+    final duration = Duration(seconds: seconds);
 
     final hours = duration.inHours;
 
-    final minutes =
-        duration.inMinutes % 60;
+    final minutes = duration.inMinutes % 60;
 
     if (hours > 0 && minutes > 0) {
       return '${hours}h ${minutes}m FREE';
@@ -2320,9 +1931,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // FIRESTORE DATE
   // ===========================================================================
 
-  DateTime? firestoreDate(
-      dynamic value,
-      ) {
+  DateTime? firestoreDate(dynamic value) {
     if (value == null) {
       return null;
     }
@@ -2346,9 +1955,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // FIRESTORE DOUBLE
   // ===========================================================================
 
-  double firestoreDouble(
-      dynamic value,
-      ) {
+  double firestoreDouble(dynamic value) {
     if (value == null) {
       return 0;
     }
@@ -2357,19 +1964,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
       return value.toDouble();
     }
 
-    return double.tryParse(
-      value.toString(),
-    ) ??
-        0;
+    return double.tryParse(value.toString()) ?? 0;
   }
 
   // ===========================================================================
   // FIRESTORE INT
   // ===========================================================================
 
-  int firestoreInt(
-      dynamic value,
-      ) {
+  int firestoreInt(dynamic value) {
     if (value == null) {
       return 0;
     }
@@ -2378,36 +1980,23 @@ class _CaroutScreenState extends State<CaroutScreen> {
       return value.toInt();
     }
 
-    return int.tryParse(
-      value.toString(),
-    ) ??
-        0;
+    return int.tryParse(value.toString()) ?? 0;
   }
 
   // ===========================================================================
   // FORMAT DATE
   // ===========================================================================
 
-  String _formatDateTime(
-      DateTime value,
-      ) {
+  String _formatDateTime(DateTime value) {
     final localValue = value.toLocal();
 
     final hour = localValue.hour;
 
-    final minute =
-    localValue.minute.toString().padLeft(
-      2,
-      '0',
-    );
+    final minute = localValue.minute.toString().padLeft(2, '0');
 
-    final period =
-    hour >= 12 ? 'PM' : 'AM';
+    final period = hour >= 12 ? 'PM' : 'AM';
 
-    final displayHour =
-    hour % 12 == 0
-        ? 12
-        : hour % 12;
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
 
     return '${localValue.day.toString().padLeft(2, '0')}/'
         '${localValue.month.toString().padLeft(2, '0')}/'
@@ -2419,11 +2008,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // CHARGE ROW
   // ===========================================================================
 
-  Widget _chargeRow(
-      ThemeData theme,
-      String label,
-      String value,
-      ) {
+  Widget _chargeRow(ThemeData theme, String label, String value) {
     final colorScheme = theme.colorScheme;
 
     return Row(
@@ -2433,10 +2018,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
             label,
             style: TextStyle(
               fontSize: 11.5,
-              color:
-              colorScheme.onSurface.withValues(
-                alpha: 0.55,
-              ),
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
             ),
           ),
         ),
@@ -2445,10 +2027,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
           style: TextStyle(
             fontSize: 11.5,
             fontWeight: FontWeight.w700,
-            color:
-            colorScheme.onSurface.withValues(
-              alpha: 0.78,
-            ),
+            color: colorScheme.onSurface.withValues(alpha: 0.78),
           ),
         ),
       ],
@@ -2459,35 +2038,23 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // INFO CARD
   // ===========================================================================
 
-  Widget _infoCard(
-      ThemeData theme,
-      List<Widget> children,
-      ) {
+  Widget _infoCard(ThemeData theme, List<Widget> children) {
     final colorScheme = theme.colorScheme;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outline.withValues(
-            alpha: 0.13,
-          ),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.13)),
       ),
       child: Column(
         children: [
-          for (int i = 0;
-          i < children.length;
-          i++) ...[
+          for (int i = 0; i < children.length; i++) ...[
             children[i],
             if (i != children.length - 1)
               Divider(
                 height: 1,
                 indent: 42,
-                color: colorScheme.outline
-                    .withValues(
-                  alpha: 0.10,
-                ),
+                color: colorScheme.outline.withValues(alpha: 0.10),
               ),
           ],
         ],
@@ -2499,38 +2066,24 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // INFO ROW
   // ===========================================================================
 
-  Widget _infoRow(
-      ThemeData theme,
-      IconData icon,
-      String label,
-      String value,
-      ) {
+  Widget _infoRow(ThemeData theme, IconData icon, String label, String value) {
     final colorScheme = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
           Icon(
             icon,
             size: 17,
-            color:
-            colorScheme.onSurface.withValues(
-              alpha: 0.40,
-            ),
+            color: colorScheme.onSurface.withValues(alpha: 0.40),
           ),
           const SizedBox(width: 10),
           Text(
             label,
             style: TextStyle(
               fontSize: 10.5,
-              color:
-              colorScheme.onSurface.withValues(
-                alpha: 0.45,
-              ),
+              color: colorScheme.onSurface.withValues(alpha: 0.45),
             ),
           ),
           const Spacer(),
@@ -2543,10 +2096,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
-                color:
-                colorScheme.onSurface.withValues(
-                  alpha: 0.75,
-                ),
+                color: colorScheme.onSurface.withValues(alpha: 0.75),
               ),
             ),
           ),
@@ -2559,10 +2109,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // INVALID TICKET
   // ===========================================================================
 
-  Widget _buildInvalidTicket(
-      ThemeData theme,
-      String message,
-      ) {
+  Widget _buildInvalidTicket(ThemeData theme, String message) {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -2572,9 +2119,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.red,
-          ),
+          style: const TextStyle(color: Colors.red),
         ),
       ),
     );
@@ -2584,9 +2129,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // NO VEHICLES
   // ===========================================================================
 
-  Widget _buildNoVehiclesFound(
-      ThemeData theme,
-      ) {
+  Widget _buildNoVehiclesFound(ThemeData theme) {
     final colorScheme = theme.colorScheme;
 
     return Center(
@@ -2599,19 +2142,13 @@ class _CaroutScreenState extends State<CaroutScreen> {
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color:
-                colorScheme
-                    .surfaceContainerHighest,
-                borderRadius:
-                BorderRadius.circular(17),
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(17),
               ),
               child: Icon(
                 Icons.search_off_rounded,
                 size: 29,
-                color:
-                colorScheme.onSurface.withValues(
-                  alpha: 0.40,
-                ),
+                color: colorScheme.onSurface.withValues(alpha: 0.40),
               ),
             ),
             const SizedBox(height: 13),
@@ -2629,10 +2166,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 11.5,
-                color:
-                colorScheme.onSurface.withValues(
-                  alpha: 0.50,
-                ),
+                color: colorScheme.onSurface.withValues(alpha: 0.50),
               ),
             ),
           ],
@@ -2645,47 +2179,24 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // SUCCESS
   // ===========================================================================
 
-  void _showSuccess(
-      String message,
-      ) {
+  void _showSuccess(String message) {
     if (!mounted) {
       return;
     }
 
-    final colorScheme =
-        Theme.of(context).colorScheme;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior:
-        SnackBarBehavior.floating,
-        backgroundColor:
-        colorScheme.primary,
-        content: Text(message),
-      ),
-    );
+    AppToast.success(context, 'Vehicle released', message);
   }
 
   // ===========================================================================
   // ERROR
   // ===========================================================================
 
-  void _showError(
-      String message,
-      ) {
+  void _showError(String message) {
     if (!mounted) {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior:
-        SnackBarBehavior.floating,
-        backgroundColor:
-        Colors.red.shade700,
-        content: Text(message),
-      ),
-    );
+    AppToast.error(context, 'Could not release vehicle', message);
   }
 }
 
@@ -2739,91 +2250,47 @@ class _Vehicle {
   // FROM FIRESTORE
   // ===========================================================================
 
-  factory _Vehicle.fromFirestore(
-      String id,
-      Map<String, dynamic> data,
-      ) {
+  factory _Vehicle.fromFirestore(String id, Map<String, dynamic> data) {
     DateTime? startTime;
 
-    final rawStartTime =
-    data['startTime'];
+    final rawStartTime = data['startTime'];
 
     if (rawStartTime is Timestamp) {
-      startTime =
-          rawStartTime.toDate();
+      startTime = rawStartTime.toDate();
     } else if (rawStartTime is DateTime) {
       startTime = rawStartTime;
     } else if (rawStartTime is String) {
-      startTime =
-          DateTime.tryParse(rawStartTime);
+      startTime = DateTime.tryParse(rawStartTime);
     }
 
     return _Vehicle(
       id: id,
 
-      vehicleNumber:
-      data['vehicleNumber']
-          ?.toString() ??
-          '',
+      vehicleNumber: data['vehicleNumber']?.toString() ?? '',
 
-      category:
-      _formatCategory(
-        data['vehicleCategory']
-            ?.toString() ??
-            '',
-      ),
+      category: _formatCategory(data['vehicleCategory']?.toString() ?? ''),
 
-      location:
-      data['locationName']
-          ?.toString() ??
-          '',
+      location: data['locationName']?.toString() ?? '',
 
-      ticketNumber:
-      data['ticketNumber']
-          ?.toString() ??
-          '',
+      ticketNumber: data['ticketNumber']?.toString() ?? '',
 
-      driverName:
-      data['driverName']
-          ?.toString() ??
-          '',
+      driverName: data['driverName']?.toString() ?? '',
 
-      phoneNumber:
-      data['phoneNumber']
-          ?.toString() ??
-          '',
+      phoneNumber: data['phoneNumber']?.toString() ?? '',
 
-      notes:
-      data['notes']
-          ?.toString() ??
-          '',
+      notes: data['notes']?.toString() ?? '',
 
-      parkingCharges:
-      _toDouble(
-        data['parkingCharges'],
-      ),
+      parkingCharges: _toDouble(data['parkingCharges']),
 
-      graceTimeSeconds:
-      _toInt(
-        data['graceTimeSeconds'],
-      ),
+      graceTimeSeconds: _toInt(data['graceTimeSeconds']),
 
       startTime: startTime,
 
-      status:
-      data['status']
-          ?.toString() ??
-          '',
+      status: data['status']?.toString() ?? '',
 
-      locationId:
-      data['locationId']
-          ?.toString() ??
-          '',
+      locationId: data['locationId']?.toString() ?? '',
 
-      locationNumericId:
-      _toInt(
-        data['locationNumericId'],
-      ),
+      locationNumericId: _toInt(data['locationNumericId']),
     );
   }
 
@@ -2831,24 +2298,19 @@ class _Vehicle {
   // CATEGORY
   // ===========================================================================
 
-  static String _formatCategory(
-      String value,
-      ) {
+  static String _formatCategory(String value) {
     if (value.isEmpty) {
       return 'Unknown';
     }
 
-    return value[0].toUpperCase() +
-        value.substring(1);
+    return value[0].toUpperCase() + value.substring(1);
   }
 
   // ===========================================================================
   // DOUBLE
   // ===========================================================================
 
-  static double _toDouble(
-      dynamic value,
-      ) {
+  static double _toDouble(dynamic value) {
     if (value == null) {
       return 0;
     }
@@ -2857,19 +2319,14 @@ class _Vehicle {
       return value.toDouble();
     }
 
-    return double.tryParse(
-      value.toString(),
-    ) ??
-        0;
+    return double.tryParse(value.toString()) ?? 0;
   }
 
   // ===========================================================================
   // INT
   // ===========================================================================
 
-  static int _toInt(
-      dynamic value,
-      ) {
+  static int _toInt(dynamic value) {
     if (value == null) {
       return 0;
     }
@@ -2878,9 +2335,6 @@ class _Vehicle {
       return value.toInt();
     }
 
-    return int.tryParse(
-      value.toString(),
-    ) ??
-        0;
+    return int.tryParse(value.toString()) ?? 0;
   }
 }
