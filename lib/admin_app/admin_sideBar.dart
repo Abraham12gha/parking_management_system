@@ -40,9 +40,9 @@ class AdminSidebar extends StatelessWidget {
       label: 'Operators',
     ),
     SidebarItem(
-      icon: Icons.location_pin,
-      selectedIcon: Icons.location_pin,
-      label: 'locations',
+      icon: Icons.location_on_outlined,
+      selectedIcon: Icons.location_on_rounded,
+      label: 'Locations',
     ),
     SidebarItem(
       icon: Icons.payments,
@@ -72,12 +72,15 @@ class AdminSidebar extends StatelessWidget {
 
     return Container(
       width: width,
-      color: colorScheme.primary,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(right: BorderSide(color: colorScheme.outlineVariant)),
+      ),
       child: SafeArea(
         child: Column(
           children: [
             _Brand(colorScheme: colorScheme),
-            Divider(color: colorScheme.onPrimary.withOpacity(0.12), height: 1),
+            Divider(color: colorScheme.outlineVariant, height: 1),
             const SizedBox(height: 12),
             Expanded(
               child: ListView.builder(
@@ -95,7 +98,7 @@ class AdminSidebar extends StatelessWidget {
                 },
               ),
             ),
-            Divider(color: colorScheme.onPrimary.withOpacity(0.12), height: 1),
+            Divider(color: colorScheme.outlineVariant, height: 1),
             _LogoutTile(colorScheme: colorScheme, onTap: onLogout),
             const SizedBox(height: 8),
           ],
@@ -119,7 +122,7 @@ class _Brand extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: colorScheme.onPrimary.withOpacity(0.15),
+              color: colorScheme.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const CompanyLogo(size: 28),
@@ -128,10 +131,9 @@ class _Brand extends StatelessWidget {
           Text(
             'Admin Panel',
             style: TextStyle(
-              color: colorScheme.onPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+              color: colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -167,7 +169,7 @@ class _SidebarTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: selected
-                  ? colorScheme.onPrimary.withOpacity(0.16)
+                  ? colorScheme.primary.withValues(alpha: 0.10)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
@@ -178,26 +180,26 @@ class _SidebarTile extends StatelessWidget {
                   width: 3,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: selected
-                        ? colorScheme.onPrimary
-                        : Colors.transparent,
+                    color: selected ? colorScheme.primary : Colors.transparent,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Icon(
                   selected ? (item.selectedIcon ?? item.icon) : item.icon,
-                  color: colorScheme.onPrimary.withOpacity(selected ? 1 : 0.75),
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
                   size: 21,
                 ),
                 const SizedBox(width: 14),
                 Text(
                   item.label,
                   style: TextStyle(
-                    color: colorScheme.onPrimary.withOpacity(
-                      selected ? 1 : 0.85,
-                    ),
-                    fontSize: 14.5,
+                    color: selected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                    fontSize: 13,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
@@ -229,17 +231,13 @@ class _LogoutTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  Icons.logout_rounded,
-                  color: colorScheme.onPrimary.withOpacity(0.85),
-                  size: 20,
-                ),
+                Icon(Icons.logout_rounded, color: colorScheme.error, size: 20),
                 const SizedBox(width: 14),
                 Text(
                   'Logout',
                   style: TextStyle(
-                    color: colorScheme.onPrimary.withOpacity(0.85),
-                    fontSize: 14.5,
+                    color: colorScheme.error,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
