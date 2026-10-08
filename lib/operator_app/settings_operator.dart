@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
 import '../theme_controller.dart';
 
@@ -626,16 +627,11 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isError
-            ? Colors.redAccent
-            : Theme.of(context).colorScheme.primary,
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, 'Could not save settings', message);
+    } else {
+      AppToast.success(context, 'Settings saved', message);
+    }
   }
 
   // ============================================================
