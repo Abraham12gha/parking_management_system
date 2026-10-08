@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../resources/widget/app_global_search.dart';
 
 class OperatorAppbar extends StatelessWidget implements PreferredSizeWidget {
   const OperatorAppbar({
@@ -21,27 +22,22 @@ class OperatorAppbar extends StatelessWidget implements PreferredSizeWidget {
   final bool showSearch;
 
   @override
-  Size get preferredSize => const Size.fromHeight(72);
+  Size get preferredSize => const Size.fromHeight(64);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final foreground = theme.appBarTheme.foregroundColor ?? colorScheme.onPrimary;
-    final background = theme.appBarTheme.backgroundColor ?? colorScheme.primary;
+    final foreground =
+        theme.appBarTheme.foregroundColor ?? colorScheme.onSurface;
+    final background = theme.appBarTheme.backgroundColor ?? colorScheme.surface;
 
     return Container(
       height: preferredSize.height,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: background,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -54,14 +50,26 @@ class OperatorAppbar extends StatelessWidget implements PreferredSizeWidget {
           ],
           Text(
             title,
-            style: TextStyle(color: foreground, fontSize: 20, fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
           ),
           const Spacer(),
           if (showSearch)
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 280),
+              constraints: const BoxConstraints(maxWidth: 360, minWidth: 160),
+              child: const AppGlobalSearch(isAdmin: false),
             ),
           const SizedBox(width: 12),
+          Tooltip(
+            message: 'Notifications',
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                Icons.notifications_none_rounded,
+                color: foreground,
+                size: 23,
+              ),
+            ),
+          ),
         ],
       ),
     );
