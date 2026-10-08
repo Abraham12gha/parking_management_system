@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../resources/widget/app_toast.dart';
 import '../app_model/location_model.dart';
 import '../app_model/parking_ticket_model.dart';
 import '../services/app_data_cache.dart';
@@ -492,23 +493,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   graceTimeSeconds: totalSeconds,
                                 );
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: const Color(0xFF2E7D32),
-                                      content: Text(
-                                        'Grace time updated to ${location.formattedGraceTime} for ${location.locationName}. Operators synced instantly!',
-                                      ),
-                                    ),
-                                  );
+                                  AppToast.success(context, 'Grace time updated', '${location.locationName} now allows ${location.formattedGraceTime}. Operators synced instantly.');
                                 }
                               } catch (e) {
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      backgroundColor: Colors.redAccent,
-                                      content: Text('Error: $e'),
-                                    ),
-                                  );
+                                  AppToast.error(context, 'Could not update grace time', '$e');
                                 }
                               }
                             },
