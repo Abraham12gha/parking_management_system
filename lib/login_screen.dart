@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:parking_management_system/services/auth.dart';
 import 'package:parking_management_system/services/company_settings_service.dart';
-import 'admin_app/Admin_Dashboard.dart';
-import 'auth_wrapper.dart';
-import 'company-data/company_info.dart';
-import 'operator_app/operator_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,10 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-
   String appVersion = '';
   String buildNumber = '';
-
 
   String? _emailError;
   String? _passwordError;
@@ -48,10 +42,10 @@ class _LoginScreenState extends State<LoginScreen> {
     loadAppVersion();
     _loadCompanySettings();
   }
+
   Future<void> _loadCompanySettings() async {
     try {
-      final settings =
-      await CompanySettingsService.instance.getSettings();
+      final settings = await CompanySettingsService.instance.getSettings();
 
       if (!mounted) return;
 
@@ -91,21 +85,22 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: Row(
         children: [
-          Expanded(
-            flex: 1,
-            child: Container(
-              color: colors.primary,
-              child: Image.asset(
-                'assets/images/Login_backgrund.jpg',
-                fit: BoxFit.cover,
-                height: double.infinity,
-                width: double.infinity,
+          if (MediaQuery.sizeOf(context).width >= 760)
+            Expanded(
+              flex: 1,
+              child: Container(
+                color: colors.primary,
+                child: Image.asset(
+                  'assets/images/Login_backgrund.jpg',
+                  fit: BoxFit.cover,
+                  height: double.infinity,
+                  width: double.infinity,
+                ),
               ),
             ),
-          ),
 
           Expanded(
-            flex: 1,
+            flex: MediaQuery.sizeOf(context).width >= 760 ? 1 : 2,
             child: Container(
               color: colors.surface,
               child: Center(
@@ -117,43 +112,39 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-
                         _logoUrl != null && _logoUrl!.isNotEmpty
                             ? Image.network(
-                          _logoUrl!,
-                          height: 70,
-                          errorBuilder: (context, error, stackTrace) {
-                            debugPrint('Could not load company logo: $error');
+                                _logoUrl!,
+                                height: 70,
+                                errorBuilder: (context, error, stackTrace) {
+                                  debugPrint(
+                                    'Could not load company logo: $error',
+                                  );
 
-                            return Image.asset(
-                              'assets/images/PVS_LOGO.png',
-                              height: 70,
-                            );
-                          },
-                        )
+                                  return Image.asset(
+                                    'assets/images/PVS_LOGO.png',
+                                    height: 70,
+                                  );
+                                },
+                              )
                             : Image.asset(
-                          'assets/images/PVS_LOGO.png',
-                          height: 70,
-                        ),
+                                'assets/images/PVS_LOGO.png',
+                                height: 70,
+                              ),
 
                         const SizedBox(height: 16),
 
                         Text(
                           _companyName,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: colors.primary,
-                          ),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontSize: 20, color: colors.primary),
                         ),
                         const SizedBox(height: 32),
 
-                        const Text(
+                        Text(
                           'Welcome Back',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -164,7 +155,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
-
 
                         TextField(
                           controller: _emailController,
@@ -247,7 +237,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             }
                           },
                         ),
-
 
                         const SizedBox(height: 16),
 
@@ -359,104 +348,99 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: _isLoading
                                 ? null
                                 : () async {
-                              setState(() {
-                                _emailError = null;
-                                _passwordError = null;
-                              });
+                                    setState(() {
+                                      _emailError = null;
+                                      _passwordError = null;
+                                    });
 
-                              bool hasError = false;
+                                    bool hasError = false;
 
-                              if (_emailController.text.trim().isEmpty) {
-                                _emailError = 'Email is required';
-                                hasError = true;
-                              }
+                                    if (_emailController.text.trim().isEmpty) {
+                                      _emailError = 'Email is required';
+                                      hasError = true;
+                                    }
 
-                              if (_passwordController.text.isEmpty) {
-                                _passwordError = 'Password is required';
-                                hasError = true;
-                              }
+                                    if (_passwordController.text.isEmpty) {
+                                      _passwordError = 'Password is required';
+                                      hasError = true;
+                                    }
 
-                              setState(() {});
+                                    setState(() {});
 
-                              if (hasError) return;
+                                    if (hasError) return;
 
-                              try {
-                                setState(() {
-                                  _isLoading = true;
-                                });
+                                    try {
+                                      setState(() {
+                                        _isLoading = true;
+                                      });
 
-                                await _auth.login(
-                                  _emailController.text.trim(),
-                                  _passwordController.text,
-                                );
+                                      await _auth.login(
+                                        _emailController.text.trim(),
+                                        _passwordController.text,
+                                      );
 
-                                if (!mounted) return;
+                                      if (!mounted) return;
 
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(
-                                    builder: (_) => const AuthWrapper(),
-                                  ),
-                                  (route) => false,
-                                );
+                                      // The root auth-state listener rebuilds the workspace,
+                                      // keeping the desktop window shell mounted.
+                                    } on FirebaseAuthException catch (e) {
+                                      debugPrint('Firebase Error: ${e.code}');
+                                      debugPrint(
+                                        'Firebase Message: ${e.message}',
+                                      );
 
-                              } on FirebaseAuthException catch (e) {
+                                      if (!mounted) return;
 
-                                debugPrint('Firebase Error: ${e.code}');
-                                debugPrint('Firebase Message: ${e.message}');
+                                      setState(() {
+                                        switch (e.code) {
+                                          case 'user-not-found':
+                                            _emailError =
+                                                'No account found with this email.';
+                                            break;
 
-                                if (!mounted) return;
+                                          case 'wrong-password':
+                                            _passwordError =
+                                                'Incorrect password.';
+                                            break;
 
-                                setState(() {
-                                  switch (e.code) {
-                                    case 'user-not-found':
-                                      _emailError =
-                                      'No account found with this email.';
-                                      break;
+                                          case 'invalid-email':
+                                            _emailError =
+                                                'Please enter a valid email address.';
+                                            break;
 
-                                    case 'wrong-password':
-                                      _passwordError =
-                                      'Incorrect password.';
-                                      break;
+                                          case 'invalid-credential':
+                                            _passwordError =
+                                                'Invalid email or password.';
+                                            break;
 
-                                    case 'invalid-email':
-                                      _emailError =
-                                      'Please enter a valid email address.';
-                                      break;
+                                          case 'user-disabled':
+                                            _emailError =
+                                                'This account has been disabled.';
+                                            break;
 
-                                    case 'invalid-credential':
-                                      _passwordError =
-                                      'Invalid email or password.';
-                                      break;
+                                          case 'too-many-requests':
+                                            _passwordError =
+                                                'Too many login attempts. Please try again later.';
+                                            break;
 
-                                    case 'user-disabled':
-                                      _emailError =
-                                      'This account has been disabled.';
-                                      break;
+                                          case 'network-request-failed':
+                                            _passwordError =
+                                                'Network error. Check your internet connection.';
+                                            break;
 
-                                    case 'too-many-requests':
-                                      _passwordError =
-                                      'Too many login attempts. Please try again later.';
-                                      break;
-
-                                    case 'network-request-failed':
-                                      _passwordError =
-                                      'Network error. Check your internet connection.';
-                                      break;
-
-                                    default:
-                                      _passwordError =
-                                      'Login failed. Please try again.';
-                                  }
-                                });
-
-                              } finally {
-                                if (mounted) {
-                                  setState(() {
-                                    _isLoading = false;
-                                  });
-                                }
-                              }
-                            },
+                                          default:
+                                            _passwordError =
+                                                'Login failed. Please try again.';
+                                        }
+                                      });
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() {
+                                          _isLoading = false;
+                                        });
+                                      }
+                                    }
+                                  },
 
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colors.primary,
@@ -467,19 +451,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: _isLoading
                                 ? SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: colors.onPrimary,
-                              ),
-                            )
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: colors.onPrimary,
+                                    ),
+                                  )
                                 : const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 16,
-                              ),
-                            ),
+                                    'Login',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 30),
@@ -492,9 +474,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontSize: 12,
                                 color: colors.onSurface.withValues(alpha: 0.5),
                               ),
-                            )
+                            ),
                           ],
-                        )
+                        ),
                       ],
                     ),
                   ),
