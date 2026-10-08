@@ -35,7 +35,7 @@ void main() async {
       titleBarStyle: TitleBarStyle.hidden,
       backgroundColor: Color(0xFFF5F8F5),
     );
-    windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
     });
