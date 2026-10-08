@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../resources/widget/app_toast.dart';
 import '../services/location_service.dart';
 
 class AddLocationAdmin extends StatefulWidget {
@@ -78,7 +79,6 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
     });
   }
 
-
   Future<void> _addLocation() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -87,8 +87,7 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
     final locationName = _locationNameController.text.trim();
     final address = _addressController.text.trim();
 
-    final parkingCharges =
-    int.parse(_parkingChargesController.text.trim());
+    final parkingCharges = int.parse(_parkingChargesController.text.trim());
 
     // Convert the selected grace time into total seconds.
     //
@@ -97,8 +96,7 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
     // = (1 * 60 + 25) minutes
     // = 85 minutes
     // = 5100 seconds
-    final graceTimeSeconds =
-        ((_graceHours * 60) + _graceMinutes) * 60;
+    final graceTimeSeconds = ((_graceHours * 60) + _graceMinutes) * 60;
 
     try {
       await _addLocationService.addLocation(
@@ -110,10 +108,10 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location added successfully'),
-        ),
+      AppToast.success(
+        context,
+        'Location added',
+        'The location is ready to manage.',
       );
 
       _locationNameController.clear();
@@ -127,17 +125,15 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to add location: $e'),
-        ),
+      AppToast.error(
+        context,
+        'Could not add location',
+        'Failed to add location: $e',
       );
 
       debugPrint('Add location error: $e');
     }
   }
-
-
 
   // ------------------------------------------------------------
   // SECTION TITLE
