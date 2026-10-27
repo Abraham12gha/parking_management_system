@@ -1,3 +1,4 @@
+import 'tenant_context.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -7,11 +8,9 @@ class ParkingTicketService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
-  ParkingTicketService({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+  ParkingTicketService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   /// Creates a new vehicle entry / parking ticket.
   /// Optimized for high-throughput heavy-traffic parking facilities:
@@ -43,7 +42,8 @@ class ParkingTicketService {
     }
 
     final cache = AppDataCache.instance;
-    final bool useCache = cache.isLoaded &&
+    final bool useCache =
+        cache.isLoaded &&
         cache.operatorId == operatorId &&
         cache.locationId != null &&
         cache.locationNumericId > 0;
@@ -58,7 +58,9 @@ class ParkingTicketService {
     if (useCache) {
       // 1. High-speed in-memory duplicate check (0ms latency)
       if (cache.isVehicleAlreadyIn(cleanPlate)) {
-        throw Exception('This vehicle is already inside this parking location.');
+        throw Exception(
+          'This vehicle is already inside this parking location.',
+        );
       }
 
       locationId = cache.locationId!;
@@ -69,7 +71,9 @@ class ParkingTicketService {
       entryOperatorName = cache.operatorName ?? '';
     } else {
       // Fallback path when cache is warming up
-      final userDoc = await _firestore.collection('users').doc(operatorId).get();
+      final userDoc = await TenantContext.instance
+          .userDocument(operatorId, firestore: _firestore)
+          .get();
       if (!userDoc.exists) {
         throw Exception('Operator profile was not found.');
       }
@@ -85,12 +89,13 @@ class ParkingTicketService {
       }
 
       locationId = locId;
-      entryOperatorName = (userData['firstName'] ?? userData['name'] ?? '').toString();
+      entryOperatorName = (userData['firstName'] ?? userData['name'] ?? '')
+          .toString();
 
       // Check duplicates from server
       final normalizedVehicleNumber = cleanPlate.replaceAll(RegExp(r'\s+'), '');
-      final activeTickets = await _firestore
-          .collection('parking_tickets')
+      final activeTickets = await TenantContext.instance
+          .collection('parking_tickets', firestore: _firestore)
           .where('locationId', isEqualTo: locationId)
           .where('status', isEqualTo: 'in')
           .get();
@@ -105,17 +110,24 @@ class ParkingTicketService {
       });
 
       if (duplicate) {
-        throw Exception('This vehicle is already inside this parking location.');
+        throw Exception(
+          'This vehicle is already inside this parking location.',
+        );
       }
 
-      final locationDoc = await _firestore.collection('locations').doc(locationId).get();
+      final locationDoc = await TenantContext.instance
+          .collection('locations', firestore: _firestore)
+          .doc(locationId)
+          .get();
       if (!locationDoc.exists) {
         throw Exception('Operator location was not found.');
       }
 
       final locationData = locationDoc.data() ?? {};
       final dynamic numId = locationData['id'];
-      locationNumericId = numId is int ? numId : int.tryParse(numId?.toString() ?? '') ?? 0;
+      locationNumericId = numId is int
+          ? numId
+          : int.tryParse(numId?.toString() ?? '') ?? 0;
       if (locationNumericId == 0) {
         throw Exception('Location numeric ID is missing.');
       }
@@ -136,42 +148,38 @@ class ParkingTicketService {
     // ------------------------------------------------------------
     // 3. Generate daily serial atomically
     // ------------------------------------------------------------
-    final counterRef = _firestore
-        .collection('counters')
+    final counterRef = TenantContext.instance
+        .collection('counters', firestore: _firestore)
         .doc('${locationCode}_$counterDate');
 
-    final int serial = await _firestore.runTransaction<int>(
-      (transaction) async {
-        final counterSnapshot = await transaction.get(counterRef);
+    final int serial = await _firestore.runTransaction<int>((
+      transaction,
+    ) async {
+      final counterSnapshot = await transaction.get(counterRef);
 
-        int nextSerial = 1;
+      int nextSerial = 1;
 
-        if (counterSnapshot.exists) {
-          final data = counterSnapshot.data();
-          final lastSerial = data?['lastSerial'];
+      if (counterSnapshot.exists) {
+        final data = counterSnapshot.data();
+        final lastSerial = data?['lastSerial'];
 
-          if (lastSerial is int) {
-            nextSerial = lastSerial + 1;
-          } else if (lastSerial != null) {
-            nextSerial = int.tryParse(lastSerial.toString()) ?? 1;
-            nextSerial += 1;
-          }
+        if (lastSerial is int) {
+          nextSerial = lastSerial + 1;
+        } else if (lastSerial != null) {
+          nextSerial = int.tryParse(lastSerial.toString()) ?? 1;
+          nextSerial += 1;
         }
+      }
 
-        transaction.set(
-          counterRef,
-          {
-            'lastSerial': nextSerial,
-            'date': counterDate,
-            'locationCode': locationCode,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
+      transaction.set(counterRef, {
+        'lastSerial': nextSerial,
+        'date': counterDate,
+        'locationCode': locationCode,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-        return nextSerial;
-      },
-    );
+      return nextSerial;
+    });
 
     final serialString = serial.toString().padLeft(4, '0');
     final ticketNumber = 'PVS#$locationCode$ticketDate$serialString';
@@ -179,7 +187,9 @@ class ParkingTicketService {
     // ------------------------------------------------------------
     // 4. Create parking ticket document
     // ------------------------------------------------------------
-    final ticketRef = _firestore.collection('parking_tickets').doc();
+    final ticketRef = TenantContext.instance
+        .collection('parking_tickets', firestore: _firestore)
+        .doc();
 
     await ticketRef.set({
       'ticketNumber': ticketNumber,

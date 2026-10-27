@@ -1,3 +1,4 @@
+import 'tenant_context.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../app_settings.dart';
@@ -10,32 +11,46 @@ class CompanySettingsService {
   static const String _collection = 'app_settings';
   static const String _document = 'general';
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  late final Stream<AppSettings> _settingsStream = _documentReference
-      .snapshots()
-      .map((snapshot) {
-        final data = snapshot.data();
-        return data == null ? const AppSettings() : AppSettings.fromMap(data);
-      })
-      .asBroadcastStream();
-
   DocumentReference<Map<String, dynamic>> get _documentReference {
-    return _firestore.collection(_collection).doc(_document);
+    return TenantContext.instance.collection(_collection).doc(_document);
+  }
+
+  Future<AppSettings> _withCompanyName(Map<String, dynamic>? data) async {
+    final company = await TenantContext.instance.companyDocument().get();
+    final name = company.data()?['name']?.toString().trim();
+    final tenantName = name?.isNotEmpty == true ? name! : 'Parking Management';
+    if (data == null) return AppSettings(appName: tenantName);
+    final settings = AppSettings.fromMap(data);
+    // Replace the legacy generic default for tenants that predate branding setup.
+    final configuredName = data['appName']?.toString().trim();
+    if (configuredName == null || configuredName.isEmpty || configuredName == 'My Admin App') {
+      return AppSettings(
+        appName: tenantName,
+        logoUrl: settings.logoUrl,
+        email: settings.email,
+        phone: settings.phone,
+      );
+    }
+    return settings;
   }
 
   Future<AppSettings> getSettings() async {
     final snapshot = await _documentReference.get();
 
     if (!snapshot.exists || snapshot.data() == null) {
-      return const AppSettings();
+      // Older tenant records may not have been initialized with a branding
+      // document. Use the company name instead of showing the app-wide default.
+      return _withCompanyName(null);
     }
 
-    return AppSettings.fromMap(snapshot.data()!);
+    return _withCompanyName(snapshot.data());
   }
 
   Stream<AppSettings> watchSettings() {
-    return _settingsStream;
+    return _documentReference.snapshots().asyncMap((snapshot) async {
+      final data = snapshot.data();
+      return _withCompanyName(data);
+    });
   }
 
   Future<void> updateSettings({

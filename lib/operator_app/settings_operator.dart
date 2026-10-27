@@ -1,12 +1,13 @@
+import '../services/tenant_context.dart';
 import 'dart:typed_data';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
+import '../services/auth.dart';
 import '../theme_controller.dart';
 
 class SettingScreenOperator extends StatefulWidget {
@@ -18,6 +19,86 @@ class SettingScreenOperator extends StatefulWidget {
 
 class _SettingScreenOperatorState extends State<SettingScreenOperator> {
 
+  Future<void> _showChangePasswordDialog() async {
+    final formKey = GlobalKey<FormState>();
+    final currentController = TextEditingController();
+    final newController = TextEditingController();
+    final confirmController = TextEditingController();
+    var hideCurrent = true;
+    var hideNew = true;
+    var hideConfirm = true;
+    var saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Change password'),
+          content: SizedBox(
+            width: 440,
+            child: Form(
+              key: formKey,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextFormField(
+                  controller: currentController,
+                  obscureText: hideCurrent,
+                  autofocus: true,
+                  decoration: InputDecoration(labelText: 'Current password', suffixIcon: IconButton(icon: Icon(hideCurrent ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setDialogState(() => hideCurrent = !hideCurrent))),
+                  validator: (value) => value == null || value.isEmpty ? 'Enter your current password' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: newController,
+                  obscureText: hideNew,
+                  decoration: InputDecoration(labelText: 'New password', suffixIcon: IconButton(icon: Icon(hideNew ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setDialogState(() => hideNew = !hideNew))),
+                  validator: (value) => value == null || value.length < 6 ? 'Use at least 6 characters' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: confirmController,
+                  obscureText: hideConfirm,
+                  decoration: InputDecoration(labelText: 'Confirm new password', suffixIcon: IconButton(icon: Icon(hideConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setDialogState(() => hideConfirm = !hideConfirm))),
+                  validator: (value) => value != newController.text ? 'Passwords do not match' : null,
+                ),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: saving ? null : () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+            FilledButton.icon(
+              onPressed: saving ? null : () async {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                setDialogState(() => saving = true);
+                try {
+                  await Auth().changeMyPassword(currentPassword: currentController.text, newPassword: newController.text);
+                  if (!dialogContext.mounted) return;
+                  Navigator.of(dialogContext).pop();
+                  if (mounted) AppToast.success(context, 'Password changed', 'Your password has been updated.');
+                } on FirebaseAuthException catch (error) {
+                  if (!dialogContext.mounted) return;
+                  final message = error.code == 'wrong-password' || error.code == 'invalid-credential'
+                      ? 'The current password is incorrect.'
+                      : error.message ?? 'Could not change the password.';
+                  AppToast.error(dialogContext, 'Password not changed', message);
+                } catch (error) {
+                  if (dialogContext.mounted) AppToast.error(dialogContext, 'Password not changed', '$error');
+                } finally {
+                  if (dialogContext.mounted) setDialogState(() => saving = false);
+                }
+              },
+              icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded),
+              label: Text(saving ? 'Saving…' : 'Save password'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    currentController.dispose();
+    newController.dispose();
+    confirmController.dispose();
+  }
+
   // ============================================================
   // Operator Information
   // ============================================================
@@ -25,6 +106,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
   String _operatorName = '';
   String _operatorEmail = '';
   String _operatorLocation = '';
+  String _companyName = 'Loading…';
 
   int? _parkingCharges;
   int? _graceTimeSeconds;
@@ -33,11 +115,12 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
   bool _loadingOperatorInfo = true;
   bool _loadingParkingCharges = true;
 
-  static const String _operatorNameKey = 'operator_name';
-  static const String _operatorEmailKey = 'operator_email';
-  static const String _operatorLocationKey = 'operator_location';
-  static const String _parkingChargesKey = 'parking_charges';
-  static const String _graceTimeKey = 'grace_time_seconds';
+  String get _preferenceScope => '${TenantContext.instance.companyId}_${TenantContext.instance.uid ?? ''}';
+  String get _operatorNameKey => 'operator_name_$_preferenceScope';
+  String get _operatorEmailKey => 'operator_email_$_preferenceScope';
+  String get _operatorLocationKey => 'operator_location_$_preferenceScope';
+  String get _parkingChargesKey => 'parking_charges_$_preferenceScope';
+  String get _graceTimeKey => 'grace_time_seconds_$_preferenceScope';
 
   // ============================================================
   // Branding
@@ -177,8 +260,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       // Get operator document
       // ----------------------------------------------------------
 
-      final userDocument = await FirebaseFirestore.instance
-          .collection('users')
+      final userDocument = await TenantContext.instance.collection('users')
           .doc(user.uid)
           .get();
 
@@ -227,8 +309,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       // Get location
       // ----------------------------------------------------------
 
-      final locationDocument = await FirebaseFirestore.instance
-          .collection('locations')
+      final locationDocument = await TenantContext.instance.collection('locations')
           .doc(locationId)
           .get();
 
@@ -440,8 +521,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       debugPrint('UID: ${user.uid}');
       debugPrint('Email: ${user.email}');
 
-      final userDocument = await FirebaseFirestore.instance
-          .collection('users')
+      final userDocument = await TenantContext.instance.collection('users')
           .doc(user.uid)
           .get();
 
@@ -464,6 +544,9 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       }
 
       final userData = userDocument.data();
+
+      final companySnapshot = await TenantContext.instance.companyDocument().get();
+      final companyName = companySnapshot.data()?['name']?.toString().trim();
 
       debugPrint('User data: $userData');
 
@@ -504,8 +587,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
         );
 
         final locationDocument =
-        await FirebaseFirestore.instance
-            .collection('locations')
+        await TenantContext.instance.collection('locations')
             .doc(locationId)
             .get();
 
@@ -562,6 +644,9 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
       if (!mounted) return;
 
       setState(() {
+        _companyName = companyName?.isNotEmpty == true
+            ? companyName!
+            : 'Company not available';
         _operatorName =
         firstName?.isNotEmpty == true
             ? firstName!
@@ -680,6 +765,14 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
                     icon: Icons.location_on_outlined,
                     label: 'Location',
                     value: _operatorLocation,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _OperatorInfoRow(
+                    icon: Icons.business_outlined,
+                    label: 'Company',
+                    value: _companyName,
                   ),
                 ],
               ),
@@ -912,7 +1005,7 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () {},
+                onPressed: _showChangePasswordDialog,
                 icon: Icon(
                   Icons.lock_outline_rounded,
                   color: colorScheme.primary,

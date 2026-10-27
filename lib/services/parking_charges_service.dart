@@ -1,20 +1,35 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'tenant_context.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'app_data_cache.dart';
 
 class ParkingChargeService {
   static int? _cachedCharge;
   static String? _cachedLocationId;
+  static String? _cachedCompanyId;
+
+  static void _ensureTenantCache() {
+    final companyId = TenantContext.instance.companyId;
+    if (_cachedCompanyId != companyId) {
+      _cachedCharge = null;
+      _cachedLocationId = null;
+      _cachedCompanyId = companyId;
+    }
+  }
 
   static int? get cachedCharge {
-    if (AppDataCache.instance.isLoaded && AppDataCache.instance.parkingCharges > 0) {
+    _ensureTenantCache();
+    if (AppDataCache.instance.isLoaded &&
+        AppDataCache.instance.parkingCharges > 0) {
       return AppDataCache.instance.parkingCharges;
     }
     return _cachedCharge;
   }
 
   static Future<int?> loadCharge({bool forceRefresh = false}) async {
-    if (AppDataCache.instance.isLoaded && AppDataCache.instance.parkingCharges > 0 && !forceRefresh) {
+    _ensureTenantCache();
+    if (AppDataCache.instance.isLoaded &&
+        AppDataCache.instance.parkingCharges > 0 &&
+        !forceRefresh) {
       return AppDataCache.instance.parkingCharges;
     }
     if (!forceRefresh && _cachedCharge != null) {
@@ -31,7 +46,7 @@ class ParkingChargeService {
       String? locationId = _cachedLocationId;
 
       if (locationId == null) {
-        final userDocument = await FirebaseFirestore.instance
+        final userDocument = await TenantContext.instance
             .collection('users')
             .doc(user.uid)
             .get();
@@ -50,7 +65,7 @@ class ParkingChargeService {
 
         _cachedLocationId = locationId;
       }
-      final locationDocument = await FirebaseFirestore.instance
+      final locationDocument = await TenantContext.instance
           .collection('locations')
           .doc(locationId)
           .get();
@@ -67,6 +82,7 @@ class ParkingChargeService {
       }
 
       _cachedCharge = (charges as num).toInt();
+      _cachedCompanyId = TenantContext.instance.companyId;
 
       return _cachedCharge;
     } catch (e) {
@@ -81,5 +97,6 @@ class ParkingChargeService {
   static void clearCache() {
     _cachedCharge = null;
     _cachedLocationId = null;
+    _cachedCompanyId = null;
   }
 }

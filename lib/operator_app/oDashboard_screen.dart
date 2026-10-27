@@ -1,3 +1,4 @@
+import '../services/tenant_context.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -167,8 +168,7 @@ Stream<List<Map<String, dynamic>>> _locationTicketDataStream(
   controller = StreamController<List<Map<String, dynamic>>>(
     onListen: () {
       final firestore = FirebaseFirestore.instance;
-      activeSub = firestore
-          .collection('parking_tickets')
+      activeSub = TenantContext.instance.collection('parking_tickets')
           .where('locationId', isEqualTo: locationId)
           .snapshots()
           .listen((snapshot) {
@@ -176,8 +176,7 @@ Stream<List<Map<String, dynamic>>> _locationTicketDataStream(
             activeReady = true;
             emit();
           }, onError: controller.addError);
-      backupSub = firestore
-          .collection('backup')
+      backupSub = TenantContext.instance.collection('backup')
           .where('locationId', isEqualTo: locationId)
           .snapshots()
           .listen(

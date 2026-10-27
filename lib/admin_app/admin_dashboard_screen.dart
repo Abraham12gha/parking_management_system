@@ -1,3 +1,4 @@
+import '../services/tenant_context.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +21,6 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final LocationService _locationService = LocationService();
   final AppDataCache _cache = AppDataCache.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _selectedLocationId = 'ALL';
   List<LocationModel> _locations = [];
@@ -493,11 +493,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   graceTimeSeconds: totalSeconds,
                                 );
                                 if (mounted) {
-                                  AppToast.success(context, 'Grace time updated', '${location.locationName} now allows ${location.formattedGraceTime}. Operators synced instantly.');
+                                  AppToast.success(
+                                    context,
+                                    'Grace time updated',
+                                    '${location.locationName} now allows ${location.formattedGraceTime}. Operators synced instantly.',
+                                  );
                                 }
                               } catch (e) {
                                 if (mounted) {
-                                  AppToast.error(context, 'Could not update grace time', '$e');
+                                  AppToast.error(
+                                    context,
+                                    'Could not update grace time',
+                                    '$e',
+                                  );
                                 }
                               }
                             },
@@ -1522,7 +1530,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Query<Map<String, dynamic>> query = _firestore
+    Query<Map<String, dynamic>> query = TenantContext.instance
         .collection('parking_tickets')
         .orderBy('createdAt', descending: true)
         .limit(10);

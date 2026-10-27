@@ -1,10 +1,11 @@
+import 'tenant_context.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../app_model/location_model.dart';
 
 class LocationService {
   LocationService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -15,8 +16,13 @@ class LocationService {
     required int graceTimeSeconds,
   }) async {
     try {
-      final locationsRef = _firestore.collection('locations');
-      final counterRef = _firestore.collection('counters').doc('locations');
+      final locationsRef = TenantContext.instance.collection(
+        'locations',
+        firestore: _firestore,
+      );
+      final counterRef = TenantContext.instance
+          .collection('counters', firestore: _firestore)
+          .doc('locations');
 
       // Get the current counter
       final counterSnapshot = await counterRef.get();
@@ -46,9 +52,7 @@ class LocationService {
       });
 
       // Update counter
-      await counterRef.set({
-        'lastId': newLocationId,
-      });
+      await counterRef.set({'lastId': newLocationId});
     } catch (e, stackTrace) {
       debugPrint('ADD LOCATION ERROR: $e');
       debugPrint('STACK TRACE: $stackTrace');
@@ -63,11 +67,16 @@ class LocationService {
     required int graceTimeSeconds,
   }) async {
     try {
-      await _firestore.collection('locations').doc(locationId).update({
-        'graceTimeSeconds': graceTimeSeconds,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      debugPrint('Updated grace time for location $locationId to $graceTimeSeconds seconds');
+      await TenantContext.instance
+          .collection('locations', firestore: _firestore)
+          .doc(locationId)
+          .update({
+            'graceTimeSeconds': graceTimeSeconds,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+      debugPrint(
+        'Updated grace time for location $locationId to $graceTimeSeconds seconds',
+      );
     } catch (e) {
       debugPrint('Error updating grace time for location $locationId: $e');
       rethrow;
@@ -83,13 +92,16 @@ class LocationService {
     required int graceTimeSeconds,
   }) async {
     try {
-      await _firestore.collection('locations').doc(locationId).update({
-        'locationName': locationName,
-        'address': address,
-        'parkingCharges': parkingCharges,
-        'graceTimeSeconds': graceTimeSeconds,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await TenantContext.instance
+          .collection('locations', firestore: _firestore)
+          .doc(locationId)
+          .update({
+            'locationName': locationName,
+            'address': address,
+            'parkingCharges': parkingCharges,
+            'graceTimeSeconds': graceTimeSeconds,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
     } catch (e) {
       debugPrint('Error updating location $locationId: $e');
       rethrow;
@@ -99,7 +111,10 @@ class LocationService {
   /// Delete a location
   Future<void> deleteLocation(String locationId) async {
     try {
-      await _firestore.collection('locations').doc(locationId).delete();
+      await TenantContext.instance
+          .collection('locations', firestore: _firestore)
+          .doc(locationId)
+          .delete();
     } catch (e) {
       debugPrint('Error deleting location $locationId: $e');
       rethrow;
@@ -109,7 +124,10 @@ class LocationService {
   /// Single location fetch
   Future<LocationModel?> getLocationById(String locationId) async {
     try {
-      final doc = await _firestore.collection('locations').doc(locationId).get();
+      final doc = await TenantContext.instance
+          .collection('locations', firestore: _firestore)
+          .doc(locationId)
+          .get();
       if (!doc.exists) return null;
       return LocationModel.fromFirestore(doc.id, doc.data() ?? {});
     } catch (e) {
@@ -120,18 +138,13 @@ class LocationService {
 
   /// Real-time stream of all parking locations
   Stream<List<LocationModel>> getLocations() {
-    return _firestore
-        .collection('locations')
+    return TenantContext.instance
+        .collection('locations', firestore: _firestore)
         .orderBy('locationName')
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map(
-                (doc) => LocationModel.fromFirestore(
-                  doc.id,
-                  doc.data(),
-                ),
-              )
+              .map((doc) => LocationModel.fromFirestore(doc.id, doc.data()))
               .toList(),
         );
   }

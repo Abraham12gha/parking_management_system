@@ -1,0 +1,355 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Temporary compatibility access for older app versions. These flat
+    // collections contain only the pre-SaaS legacy company's records.
+    function isLegacyAdmin() {
+      return signedIn() && request.auth.uid == 'HbRJxw5lsIYzSMC4KK6hm3hbFEU2';
+    }
+
+    function isLegacyOperator() {
+      return signedIn()
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator';
+    }
+
+    function canWriteLegacySavedReport() {
+      return (isLegacyAdmin()
+              && request.resource.data.audience == 'admin'
+              && request.resource.data.operatorId == ''
+              && request.resource.data.createdBy == request.auth.uid)
+          || (isLegacyOperator()
+              && request.resource.data.audience == 'operator'
+              && request.resource.data.operatorId == request.auth.uid
+              && request.resource.data.createdBy == request.auth.uid);
+    }
+
+    function memberPath(companyId, uid) {
+      return /databases/$(database)/documents/tenant_users/$(uid);
+    }
+
+    function companyPath(companyId) {
+      return /databases/$(database)/documents/companies/$(companyId);
+    }
+
+    function profilePath(companyId, uid) {
+      return /databases/$(database)/documents/companies/$(companyId)/users/$(uid);
+    }
+
+    function isSuperAdmin() {
+      return signedIn()
+          && exists(/databases/$(database)/documents/platform_admins/$(request.auth.uid))
+          && get(/databases/$(database)/documents/platform_admins/$(request.auth.uid)).data.enabled == true;
+    }
+
+    function isCompanyActive(companyId) {
+      return exists(companyPath(companyId))
+          && get(companyPath(companyId)).data.status == 'active';
+    }
+
+    function hasTenantMembership(companyId, uid) {
+      return exists(memberPath(companyId, uid))
+          && get(memberPath(companyId, uid)).data.companyId == companyId
+          && get(memberPath(companyId, uid)).data.status == 'active';
+    }
+
+    function isMember(companyId) {
+      return signedIn()
+          && hasTenantMembership(companyId, request.auth.uid)
+          && isCompanyActive(companyId);
+    }
+
+    function isAdmin(companyId) {
+      return isMember(companyId)
+          && get(memberPath(companyId, request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOperator(companyId) {
+      return isMember(companyId)
+          && get(memberPath(companyId, request.auth.uid)).data.role == 'operator';
+    }
+
+    // Expired admins are blocked from business data, but can still request a
+    // renewal so the platform owner is not a single point of operational lockout.
+    function isTenantAdminRegardlessOfCompanyStatus(companyId) {
+      return signedIn()
+          && hasTenantMembership(companyId, request.auth.uid)
+          && get(memberPath(companyId, request.auth.uid)).data.role == 'admin';
+    }
+
+    function operatorOwnsLocation(companyId, locationId) {
+      return isOperator(companyId)
+          && get(memberPath(companyId, request.auth.uid)).data.location == locationId;
+    }
+
+    function validNewCompanyMember(companyId, uid) {
+      return getAfter(memberPath(companyId, uid)).data.companyId == companyId
+          && getAfter(memberPath(companyId, uid)).data.role == 'operator'
+          && getAfter(memberPath(companyId, uid)).data.status == 'active';
+    }
+
+    function canWriteSavedReport(companyId) {
+      return (isAdmin(companyId)
+              && request.resource.data.audience == 'admin'
+              && request.resource.data.operatorId == ''
+              && request.resource.data.createdBy == request.auth.uid)
+          || (isOperator(companyId)
+              && request.resource.data.audience == 'operator'
+              && request.resource.data.operatorId == request.auth.uid
+              && request.resource.data.createdBy == request.auth.uid);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isLegacyAdmin());
+      allow create: if isLegacyAdmin();
+      allow update: if signedIn() && (request.auth.uid == userId || isLegacyAdmin());
+      allow delete: if isLegacyAdmin();
+    }
+
+    match /app_settings/general {
+      allow read: if isLegacyAdmin() || isLegacyOperator();
+      allow write: if isLegacyAdmin();
+    }
+
+    match /locations/{locationId} {
+      allow read: if isLegacyAdmin() || isLegacyOperator();
+      allow create, update, delete: if isLegacyAdmin();
+    }
+
+    match /counters/{counterId} {
+      allow read, write: if isLegacyAdmin() || isLegacyOperator();
+    }
+
+    match /parking_tickets/{ticketId} {
+      allow read, create, update, delete: if isLegacyAdmin() || isLegacyOperator();
+    }
+
+    match /backup/{backupId} {
+      allow create: if isLegacyAdmin() || isLegacyOperator();
+      allow read, update, delete: if isLegacyAdmin();
+    }
+
+    match /saved_reports/{reportId} {
+      allow get: if isLegacyAdmin()
+          || (isLegacyOperator()
+              && (resource == null
+                  || (resource.data.audience == 'operator'
+                      && resource.data.operatorId == request.auth.uid)));
+      allow list: if (isLegacyAdmin() && resource.data.audience == 'admin')
+          || (isLegacyOperator()
+              && resource.data.audience == 'operator'
+              && resource.data.operatorId == request.auth.uid);
+      allow create, update: if canWriteLegacySavedReport();
+      allow delete: if isLegacyAdmin()
+          || (isLegacyOperator()
+              && resource.data.audience == 'operator'
+              && resource.data.operatorId == request.auth.uid);
+    }
+
+    match /report_states/{ownerId} {
+      allow read, write: if (isLegacyAdmin() && ownerId == 'admin')
+          || (isLegacyOperator() && ownerId == request.auth.uid);
+    }
+
+    // This small root index resolves a user's tenant after Firebase Auth login.
+    // Business records live only below companies/{companyId}.
+    match /tenant_users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid
+          || (signedIn() && resource != null && isAdmin(resource.data.companyId));
+      allow list: if false;
+
+      // Initial admin membership is only valid in the same atomic batch that
+      // creates a company owned by this uid and its admin profile.
+      allow create: if signedIn() && request.auth.uid == uid
+          && request.resource.data.role == 'admin'
+          && request.resource.data.status == 'active'
+          && getAfter(companyPath(request.resource.data.companyId)).data.ownerUid == uid
+          && getAfter(profilePath(request.resource.data.companyId, uid)).data.role == 'admin'
+          || isSuperAdmin()
+          && request.resource.data.role == 'admin'
+          && getAfter(companyPath(request.resource.data.companyId)).data.ownerUid == uid
+          && getAfter(profilePath(request.resource.data.companyId, uid)).data.role == 'admin'
+          || signedIn()
+          && request.resource.data.role == 'operator'
+          && isAdmin(request.resource.data.companyId)
+          && getAfter(profilePath(request.resource.data.companyId, uid)).data.role == 'operator';
+
+      // Company admins can disable operators, but cannot change membership
+      // company or role. Users can update only their display name/email.
+      allow update: if signedIn()
+          && request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.role == resource.data.role
+          && ((isAdmin(resource.data.companyId)
+                && request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(['status', 'location', 'name', 'email', 'updatedAt']))
+              || (request.auth.uid == uid
+                && request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(['name', 'email', 'updatedAt'])));
+      allow delete: if isAdmin(resource.data.companyId)
+          && resource.data.role == 'operator'
+          && !existsAfter(profilePath(resource.data.companyId, uid));
+    }
+
+    match /platform_admins/{uid} {
+      // Bootstrap and manage this allowlist manually in the Firebase Console.
+      // Clients can only check their own record and can never modify it.
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    match /companies/{companyId} {
+      // Avoid recursively evaluating company status while loading the company
+      // record; business subcollections still require an active company.
+      allow get: if isSuperAdmin()
+          || (signedIn() && hasTenantMembership(companyId, request.auth.uid));
+      allow list: if isSuperAdmin();
+      allow create: if (signedIn()
+          && request.resource.data.ownerUid == request.auth.uid
+          || isSuperAdmin())
+          && request.resource.data.status == 'pending'
+          && request.resource.data.plan == request.resource.data.billingCycle
+          && request.resource.data.paymentStatus == 'pending'
+          && request.resource.data.billingCycle in ['monthly', 'yearly']
+          && getAfter(memberPath(companyId, request.resource.data.ownerUid)).data.companyId == companyId
+          && getAfter(memberPath(companyId, request.resource.data.ownerUid)).data.role == 'admin'
+          && getAfter(profilePath(companyId, request.resource.data.ownerUid)).data.role == 'admin';
+      // Only a manually allowlisted platform admin can record offline payment
+      // confirmation or suspend a company. Tenant admins cannot change this.
+      allow update: if isSuperAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'paymentStatus', 'billingCycle', 'plan', 'planPriceUsd', 'subscriptionEndsAt', 'updatedAt'])
+          && request.resource.data.status in ['pending', 'active', 'suspended', 'expired']
+          && request.resource.data.paymentStatus in ['pending', 'paid', 'unpaid']
+          && (!request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['billingCycle', 'plan', 'planPriceUsd'])
+              || (request.resource.data.billingCycle in ['monthly', 'yearly']
+                  && request.resource.data.plan == request.resource.data.billingCycle
+                  && request.resource.data.planPriceUsd in [50, 600]));
+      allow delete: if false;
+
+      match /users/{uid} {
+        allow read: if isAdmin(companyId)
+            || (isMember(companyId) && request.auth.uid == uid);
+        allow create: if signedIn() && request.resource.data.role == 'admin'
+              && request.resource.data.companyId == companyId
+              && (uid == request.auth.uid || isSuperAdmin())
+              && getAfter(companyPath(companyId)).data.ownerUid == uid
+              && getAfter(memberPath(companyId, uid)).data.companyId == companyId
+          || isAdmin(companyId)
+              && request.resource.data.role == 'operator'
+              && request.resource.data.companyId == companyId
+              && validNewCompanyMember(companyId, uid);
+        allow update: if isAdmin(companyId)
+              && request.resource.data.companyId == companyId
+              && request.resource.data.role == resource.data.role
+              && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['firstName', 'lastName', 'email', 'location', 'disabled', 'status', 'updatedAt'])
+          || (isMember(companyId) && request.auth.uid == uid
+              && request.resource.data.companyId == companyId
+              && request.resource.data.role == resource.data.role
+              && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['firstName', 'lastName', 'email', 'updatedAt']));
+        allow delete: if isAdmin(companyId)
+            && resource.data.role == 'operator'
+            && !existsAfter(memberPath(companyId, uid));
+      }
+
+      match /app_settings/{settingsId} {
+        allow read: if isMember(companyId);
+        allow write: if isAdmin(companyId);
+      }
+
+      match /locations/{locationId} {
+        allow read: if isMember(companyId);
+        allow create, update, delete: if isAdmin(companyId);
+      }
+
+      match /counters/{counterId} {
+        allow read, write: if isAdmin(companyId) || isOperator(companyId);
+      }
+
+      match /parking_tickets/{ticketId} {
+        allow read: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location);
+        allow create: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && request.resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location
+                && request.resource.data.operatorId == request.auth.uid);
+        allow update: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location
+                && request.resource.data.locationId == resource.data.locationId);
+        allow delete: if isAdmin(companyId);
+      }
+
+      match /backup/{backupId} {
+        allow read: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location);
+        allow update, delete: if isAdmin(companyId);
+        allow create: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && request.resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location);
+      }
+
+      match /saved_reports/{reportId} {
+        allow get: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && (resource == null
+                    || (resource.data.audience == 'operator'
+                        && resource.data.operatorId == request.auth.uid)));
+        allow list: if (isAdmin(companyId) && resource.data.audience == 'admin')
+            || (isOperator(companyId)
+                && resource.data.audience == 'operator'
+                && resource.data.operatorId == request.auth.uid);
+        allow create, update: if canWriteSavedReport(companyId);
+        allow delete: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && resource.data.audience == 'operator'
+                && resource.data.operatorId == request.auth.uid);
+      }
+
+      match /report_states/{ownerId} {
+        allow read, write: if (isAdmin(companyId) && ownerId == 'admin')
+            || (isOperator(companyId) && ownerId == request.auth.uid);
+      }
+
+      match /billing_requests/{requestId} {
+        // Platform admins review requests through company-scoped listeners.
+        // Keeping this read at the tenant path avoids a broad collection-group
+        // query and does not grant access to other tenant business data.
+        allow read: if isSuperAdmin();
+        allow get, list: if isTenantAdminRegardlessOfCompanyStatus(companyId)
+                && resource.data.companyId == companyId
+                && resource.data.requestedBy == request.auth.uid;
+        allow create: if isTenantAdminRegardlessOfCompanyStatus(companyId)
+            && request.resource.data.companyId == companyId
+            && request.resource.data.requestedBy == request.auth.uid
+            && request.resource.data.status == 'pending'
+            && ((!('requestType' in request.resource.data)
+                    && request.resource.data.currency == 'USD'
+                    && ((request.resource.data.billingCycle == 'monthly'
+                            && request.resource.data.amountUsd == 50)
+                        || (request.resource.data.billingCycle == 'yearly'
+                            && request.resource.data.amountUsd == 600)))
+                || (request.resource.data.requestType == 'suspension_review'
+                    && request.resource.data.keys().hasAll([
+                      'requestType', 'companyId', 'requestedBy', 'status', 'createdAt'
+                    ])
+                    && request.resource.data.keys().hasOnly([
+                      'requestType', 'companyId', 'requestedBy', 'status', 'createdAt'
+                    ])));
+        allow update: if isSuperAdmin()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'reviewedAt', 'reviewedBy']);
+        allow delete: if false;
+      }
+    }
+  }
+}

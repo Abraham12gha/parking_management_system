@@ -13,6 +13,7 @@ class CloudinaryService {
   Future<String> uploadImage({
     required Uint8List bytes,
     required String fileName,
+    required String companyId,
   }) async {
     final uri = Uri.parse(
       'https://api.cloudinary.com/v1_1/$_cloudName/image/upload',
@@ -21,13 +22,10 @@ class CloudinaryService {
     final request = http.MultipartRequest('POST', uri);
 
     request.fields['upload_preset'] = _uploadPreset;
+    request.fields['folder'] = 'companies/$companyId/branding';
 
     request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: fileName,
-      ),
+      http.MultipartFile.fromBytes('file', bytes, filename: fileName),
     );
 
     final response = await request.send();
