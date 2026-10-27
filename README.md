@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="assets/images/PVS_LOGO.png" alt="Parking Management" width="112" />
 
   # Parking Management System
 
