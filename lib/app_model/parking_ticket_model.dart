@@ -9,6 +9,8 @@ class ParkingTicketModel {
   final String vehicleNumber;
 
   final String driverName;
+  final String entryDriverName;
+  final String exitDriverName;
   final String phoneNumber;
   final String notes;
 
@@ -42,6 +44,8 @@ class ParkingTicketModel {
     required this.vehicleCategory,
     required this.vehicleNumber,
     required this.driverName,
+    this.entryDriverName = '',
+    this.exitDriverName = '',
     required this.phoneNumber,
     required this.notes,
     required this.locationId,
@@ -74,6 +78,9 @@ class ParkingTicketModel {
       vehicleCategory: data['vehicleCategory'] as String? ?? '',
       vehicleNumber: data['vehicleNumber'] as String? ?? '',
       driverName: data['driverName'] as String? ?? '',
+      entryDriverName: data['entryDriverName'] as String? ??
+          data['driverName'] as String? ?? '',
+      exitDriverName: data['exitDriverName'] as String? ?? '',
       phoneNumber: data['phoneNumber'] as String? ?? '',
       notes: data['notes'] as String? ?? 'clear',
 
@@ -122,6 +129,8 @@ class ParkingTicketModel {
       'vehicleNumber': vehicleNumber,
 
       'driverName': driverName,
+      'entryDriverName': entryDriverName.isEmpty ? driverName : entryDriverName,
+      'exitDriverName': exitDriverName,
       'phoneNumber': phoneNumber,
       'notes': notes,
 
@@ -157,6 +166,8 @@ class ParkingTicketModel {
     String? vehicleCategory,
     String? vehicleNumber,
     String? driverName,
+    String? entryDriverName,
+    String? exitDriverName,
     String? phoneNumber,
     String? notes,
     String? locationId,
@@ -183,6 +194,8 @@ class ParkingTicketModel {
       vehicleCategory: vehicleCategory ?? this.vehicleCategory,
       vehicleNumber: vehicleNumber ?? this.vehicleNumber,
       driverName: driverName ?? this.driverName,
+      entryDriverName: entryDriverName ?? this.entryDriverName,
+      exitDriverName: exitDriverName ?? this.exitDriverName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       notes: notes ?? this.notes,
       locationId: locationId ?? this.locationId,
