@@ -1,3 +1,5 @@
+import '../../services/tenant_context.dart';
+import '../../services/app_data_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -81,15 +83,26 @@ class _SearchResultsDialogState extends State<_SearchResultsDialog> {
   late final Future<List<_SearchResult>> _results = _load();
 
   Future<List<_SearchResult>> _load() async {
-    final db = FirebaseFirestore.instance;
     final q = widget.query.toLowerCase();
+    Query<Map<String, dynamic>> tickets = TenantContext.instance.collection(
+      'parking_tickets',
+    );
+    Query<Map<String, dynamic>> backup = TenantContext.instance.collection(
+      'backup',
+    );
+    if (!widget.isAdmin) {
+      final locationId = AppDataCache.instance.locationId;
+      if (locationId == null || locationId.isEmpty) return [];
+      tickets = tickets.where('locationId', isEqualTo: locationId);
+      backup = backup.where('locationId', isEqualTo: locationId);
+    }
     final futures = <Future<QuerySnapshot<Map<String, dynamic>>>>[
-      db.collection('parking_tickets').get(),
-      db.collection('backup').get(),
+      tickets.get(),
+      backup.get(),
     ];
     if (widget.isAdmin) {
-      futures.add(db.collection('users').get());
-      futures.add(db.collection('locations').get());
+      futures.add(TenantContext.instance.collection('users').get());
+      futures.add(TenantContext.instance.collection('locations').get());
     }
     final snapshots = await Future.wait(futures);
     final results = <_SearchResult>[];

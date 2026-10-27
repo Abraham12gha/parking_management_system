@@ -1,3 +1,4 @@
+import '../services/tenant_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -107,8 +108,7 @@ class _CarinScreenState extends State<CarinScreen> {
 
       String? ticketNumber;
       try {
-        final ticket = await FirebaseFirestore.instance
-            .collection('parking_tickets')
+        final ticket = await TenantContext.instance.collection('parking_tickets')
             .doc(ticketId)
             .get();
         ticketNumber = ticket.data()?['ticketNumber']?.toString();

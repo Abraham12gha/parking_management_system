@@ -1,3 +1,4 @@
+import '../services/tenant_context.dart';
 // import 'dart:async';
 //
 // import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1749,9 +1750,11 @@ class _ActiveVehiclesScreenState extends State<ActiveVehiclesScreen> {
 
   String? _accountLocationId;
   String? _accountLocationName;
+  String? _locationLoadError;
   bool _loadingLocation = true;
 
   Future<void> _loadAccountLocation() async {
+    try {
     if (AppDataCache.instance.isLoaded && AppDataCache.instance.locationId != null) {
       if (mounted) {
         setState(() {
@@ -1766,57 +1769,67 @@ class _ActiveVehiclesScreenState extends State<ActiveVehiclesScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
+      if (!mounted) return;
       setState(() {
         _loadingLocation = false;
+        _locationLoadError = 'No signed-in operator account was found.';
       });
       return;
     }
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
+    final userDoc = await TenantContext.instance.collection('users')
         .doc(user.uid)
         .get();
 
     if (!userDoc.exists) {
+      if (!mounted) return;
       setState(() {
         _loadingLocation = false;
+        _locationLoadError = 'Operator profile is missing from this company workspace.';
       });
       return;
     }
 
-    final locationId = userDoc.data()?['location'] as String?;
+    final locationId = userDoc.data()?['location']?.toString().trim();
 
     if (locationId == null || locationId.isEmpty) {
+      if (!mounted) return;
       setState(() {
         _loadingLocation = false;
+        _locationLoadError = 'No parking location is assigned to this operator.';
       });
       return;
     }
 
     // Get the location document
-    final locationDoc = await FirebaseFirestore.instance
-        .collection('locations')
+    final locationDoc = await TenantContext.instance.collection('locations')
         .doc(locationId)
         .get();
 
+    if (!mounted) return;
     setState(() {
       _accountLocationId = locationId;
-      _accountLocationName =
-      locationDoc.data()?['locationName'] as String?;
+      _accountLocationName = locationDoc.data()?['locationName']?.toString();
       _loadingLocation = false;
+      _locationLoadError = null;
     });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingLocation = false;
+        _locationLoadError = error.toString().replaceFirst('Bad state: ', '');
+      });
+    }
   }
 
   Query<Map<String, dynamic>> get _activeVehiclesQuery {
     if (_accountLocationId == null || _accountLocationId!.isEmpty) {
       // Return a query that will not expose other locations.
-      return FirebaseFirestore.instance
-          .collection('parking_tickets')
+      return TenantContext.instance.collection('parking_tickets')
           .where('locationId', isEqualTo: '__NO_LOCATION__');
     }
 
-    return FirebaseFirestore.instance
-        .collection('parking_tickets')
+    return TenantContext.instance.collection('parking_tickets')
         .where('status', isEqualTo: 'in')
         .where(
       'locationId',
@@ -1892,6 +1905,10 @@ class _ActiveVehiclesScreenState extends State<ActiveVehiclesScreen> {
 
     if (_loadingLocation) {
       return _buildLoadingState(theme);
+    }
+
+    if (_locationLoadError != null) {
+      return _buildErrorState(theme, error: _locationLoadError!);
     }
 
     return Column(

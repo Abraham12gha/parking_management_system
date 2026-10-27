@@ -1,3 +1,4 @@
+import 'tenant_context.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,7 +13,6 @@ class AppDataCache {
   AppDataCache._();
   static final AppDataCache instance = AppDataCache._();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Cached User & Location State
@@ -57,7 +57,10 @@ class AppDataCache {
 
   /// Fast in-memory duplicate plate check for high-traffic entry barriers.
   bool isVehicleAlreadyIn(String vehicleNumber) {
-    final clean = vehicleNumber.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+    final clean = vehicleNumber.trim().toUpperCase().replaceAll(
+      RegExp(r'\s+'),
+      '',
+    );
     return _activePlatesSet.contains(clean);
   }
 
@@ -85,7 +88,10 @@ class AppDataCache {
 
     try {
       // 1. Fetch user doc
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userDoc = await TenantContext.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (!userDoc.exists) {
         _isLoading = false;
         return;
@@ -93,7 +99,8 @@ class AppDataCache {
 
       final userData = userDoc.data() ?? {};
       _userRole = userData['role']?.toString();
-      _operatorName = (userData['firstName'] ?? userData['name'] ?? '').toString();
+      _operatorName = (userData['firstName'] ?? userData['name'] ?? '')
+          .toString();
       final locId = userData['location']?.toString().trim();
 
       if (locId != null && locId.isNotEmpty) {
@@ -122,7 +129,10 @@ class AppDataCache {
 
     // Initial read
     try {
-      final locDoc = await _firestore.collection('locations').doc(locId).get();
+      final locDoc = await TenantContext.instance
+          .collection('locations')
+          .doc(locId)
+          .get();
       if (locDoc.exists) {
         _applyLocationData(locDoc.data() ?? {});
       }
@@ -131,20 +141,20 @@ class AppDataCache {
     }
 
     // Real-time updates subscription
-    _locationSub = _firestore
+    _locationSub = TenantContext.instance
         .collection('locations')
         .doc(locId)
         .snapshots()
         .listen(
-      (snapshot) {
-        if (!snapshot.exists) return;
-        final data = snapshot.data() ?? {};
-        _applyLocationData(data);
-      },
-      onError: (err) {
-        debugPrint('Location settings stream error: $err');
-      },
-    );
+          (snapshot) {
+            if (!snapshot.exists) return;
+            final data = snapshot.data() ?? {};
+            _applyLocationData(data);
+          },
+          onError: (err) {
+            debugPrint('Location settings stream error: $err');
+          },
+        );
   }
 
   void _applyLocationData(Map<String, dynamic> locData) {
@@ -181,50 +191,63 @@ class AppDataCache {
   Future<void> _persistPreferences(int charges, int grace) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('parking_charges', charges);
-      await prefs.setInt('grace_time_seconds', grace);
+      final scope = '${TenantContext.instance.companyId}_${_operatorId ?? ''}';
+      await prefs.setInt('parking_charges_$scope', charges);
+      await prefs.setInt('grace_time_seconds_$scope', grace);
     } catch (_) {}
   }
 
   void _listenToActiveTickets(String locId) {
     _activeTicketsSub?.cancel();
-    _activeTicketsSub = _firestore
+    _activeTicketsSub = TenantContext.instance
         .collection('parking_tickets')
         .where('locationId', isEqualTo: locId)
         .where('status', isEqualTo: 'in')
         .snapshots()
         .listen(
-      (snapshot) {
-        final list = snapshot.docs
-            .map((doc) => ParkingTicketModel.fromFirestore(doc))
-            .toList();
-        _cachedActiveTickets = list;
+          (snapshot) {
+            final list = snapshot.docs
+                .map((doc) => ParkingTicketModel.fromFirestore(doc))
+                .toList();
+            _cachedActiveTickets = list;
 
-        // Update in-memory plate index for instantaneous duplicate checks
-        _activePlatesSet.clear();
-        for (final ticket in list) {
-          final clean = ticket.vehicleNumber.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
-          if (clean.isNotEmpty) {
-            _activePlatesSet.add(clean);
-          }
-        }
+            // Update in-memory plate index for instantaneous duplicate checks
+            _activePlatesSet.clear();
+            for (final ticket in list) {
+              final clean = ticket.vehicleNumber
+                  .trim()
+                  .toUpperCase()
+                  .replaceAll(RegExp(r'\s+'), '');
+              if (clean.isNotEmpty) {
+                _activePlatesSet.add(clean);
+              }
+            }
 
-        activeTicketsNotifier.value = list;
-      },
-      onError: (err) {
-        debugPrint('Active tickets stream error: $err');
-      },
-    );
+            activeTicketsNotifier.value = list;
+          },
+          onError: (err) {
+            debugPrint('Active tickets stream error: $err');
+          },
+        );
   }
 
   /// System-wide active tickets stream (used by Admin Dashboard)
-  Stream<List<ParkingTicketModel>> systemWideActiveTicketsStream({String? locationId}) {
-    Query<Map<String, dynamic>> query = _firestore
+  Stream<List<ParkingTicketModel>> systemWideActiveTicketsStream({
+    String? locationId,
+  }) {
+    Query<Map<String, dynamic>> query = TenantContext.instance
         .collection('parking_tickets')
         .where('status', isEqualTo: 'in');
 
-    if (locationId != null && locationId.isNotEmpty && locationId != 'ALL') {
-      query = query.where('locationId', isEqualTo: locationId);
+    final scopedLocation = _userRole == 'operator' ? _locationId : locationId;
+    if (_userRole == 'operator' &&
+        (scopedLocation == null || scopedLocation.isEmpty)) {
+      return Stream.value([]);
+    }
+    if (scopedLocation != null &&
+        scopedLocation.isNotEmpty &&
+        scopedLocation != 'ALL') {
+      query = query.where('locationId', isEqualTo: scopedLocation);
     }
 
     return query.snapshots().map(
@@ -236,20 +259,22 @@ class AppDataCache {
 
   /// Stream of all tickets for the assigned location
   Stream<List<ParkingTicketModel>> ticketsStream({String? specificLocationId}) {
-    final locId = specificLocationId ?? _locationId;
+    final locId = _userRole == 'operator'
+        ? _locationId
+        : specificLocationId ?? _locationId;
     if (locId == null || locId.isEmpty) {
       return Stream.value([]);
     }
 
-    return _firestore
+    return TenantContext.instance
         .collection('parking_tickets')
         .where('locationId', isEqualTo: locId)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => ParkingTicketModel.fromFirestore(doc))
-          .toList();
-    });
+          return snapshot.docs
+              .map((doc) => ParkingTicketModel.fromFirestore(doc))
+              .toList();
+        });
   }
 
   /// Fetch tickets within a date range for reports and analytics with local cache speed
@@ -259,9 +284,12 @@ class AppDataCache {
     DateTime? endDate,
     int? limit,
   }) async {
-    final locId = specificLocationId ?? _locationId;
-    Query<Map<String, dynamic>> query =
-        _firestore.collection('parking_tickets');
+    final locId = _userRole == 'operator'
+        ? _locationId
+        : specificLocationId ?? _locationId;
+    Query<Map<String, dynamic>> query = TenantContext.instance.collection(
+      'parking_tickets',
+    );
 
     if (locId != null && locId.isNotEmpty && locId != 'ALL') {
       query = query.where('locationId', isEqualTo: locId);
@@ -278,12 +306,13 @@ class AppDataCache {
 
       QuerySnapshot<Map<String, dynamic>>? completedSnapshot;
       try {
-        Query<Map<String, dynamic>> completedQuery =
-            _firestore.collection('backup');
+        Query<Map<String, dynamic>> completedQuery = TenantContext.instance
+            .collection('backup');
         if (locId != null && locId.isNotEmpty && locId != 'ALL') {
           completedQuery = completedQuery.where('locationId', isEqualTo: locId);
         }
-        if (limit != null && limit > 0) completedQuery = completedQuery.limit(limit);
+        if (limit != null && limit > 0)
+          completedQuery = completedQuery.limit(limit);
         completedSnapshot = await completedQuery.get(
           const GetOptions(source: Source.serverAndCache),
         );
@@ -294,14 +323,15 @@ class AppDataCache {
       var list = [
         ...activeSnapshot.docs,
         ...?completedSnapshot?.docs,
-      ]
-          .map((doc) => ParkingTicketModel.fromFirestore(doc))
-          .toList();
+      ].map((doc) => ParkingTicketModel.fromFirestore(doc)).toList();
 
       // Precision date filtering
       if (startDate != null) {
         list = list.where((t) {
-          final time = (t.status.toLowerCase() == 'in' ? t.startTime : t.endTime)?.toDate() ?? t.startTime?.toDate();
+          final time =
+              (t.status.toLowerCase() == 'in' ? t.startTime : t.endTime)
+                  ?.toDate() ??
+              t.startTime?.toDate();
           if (time == null) return false;
           return !time.isBefore(startDate);
         }).toList();
@@ -309,7 +339,10 @@ class AppDataCache {
 
       if (endDate != null) {
         list = list.where((t) {
-          final time = (t.status.toLowerCase() == 'in' ? t.startTime : t.endTime)?.toDate() ?? t.startTime?.toDate();
+          final time =
+              (t.status.toLowerCase() == 'in' ? t.startTime : t.endTime)
+                  ?.toDate() ??
+              t.startTime?.toDate();
           if (time == null) return false;
           return !time.isAfter(endDate);
         }).toList();

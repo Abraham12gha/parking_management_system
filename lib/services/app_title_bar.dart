@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 import '../app_settings.dart';
 import '../resources/widget/company_logo.dart';
 import 'company_settings_service.dart';
+import 'tenant_context.dart';
 
 class AdminTitleBar extends StatefulWidget {
   const AdminTitleBar({super.key});
@@ -76,7 +77,12 @@ class _AdminTitleBarState extends State<AdminTitleBar> {
                     const SizedBox(width: 11),
                     Expanded(
                       child: StreamBuilder<AppSettings>(
-                        stream: CompanySettingsService.instance.watchSettings(),
+                        // The desktop title bar is part of the app shell, so it
+                        // is built on login and platform-admin screens too.
+                        // Those screens do not have a tenant context yet.
+                        stream: TenantContext.instance.isReady
+                            ? CompanySettingsService.instance.watchSettings()
+                            : Stream<AppSettings>.value(const AppSettings()),
                         builder: (context, snapshot) {
                           final configuredName = snapshot.data?.appName.trim();
                           final title =

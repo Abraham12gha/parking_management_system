@@ -1,5 +1,5 @@
+import '../services/tenant_context.dart';
 import 'dart:typed_data';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -93,6 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         newLogoUrl = await CloudinaryService.instance.uploadImage(
           bytes: _logoBytes!,
           fileName: 'app_logo.jpg',
+          companyId: TenantContext.instance.companyId!,
         );
 
         debugPrint('Cloudinary URL: $newLogoUrl');
@@ -183,8 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      final userDocument = await FirebaseFirestore.instance
-          .collection('users')
+      final userDocument = await TenantContext.instance.collection('users')
           .doc(user.uid)
           .get();
 

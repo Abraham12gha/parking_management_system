@@ -1,3 +1,4 @@
+import '../services/tenant_context.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -66,8 +67,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
           throw Exception('No authenticated user found.');
         }
 
-        final userSnapshot = await _firestore
-            .collection('users')
+        final userSnapshot = await TenantContext.instance.collection('users')
             .doc(user.uid)
             .get();
 
@@ -87,8 +87,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
       setState(() {
         _userLocationId = locationId;
-        _activeVehiclesStream = _firestore
-            .collection('parking_tickets')
+        _activeVehiclesStream = TenantContext.instance.collection('parking_tickets')
             .where('status', isEqualTo: 'in')
             .where('locationId', isEqualTo: locationId)
             .snapshots()
@@ -1230,7 +1229,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   Future<void> _saveVehicleNotes(_Vehicle vehicle) async {
     setState(() => _savingNotes = true);
     try {
-      await _firestore.collection('parking_tickets').doc(vehicle.id).update({
+      await TenantContext.instance.collection('parking_tickets').doc(vehicle.id).update({
         'notes': _notesController.text.trim(),
       });
       if (mounted)
@@ -1574,8 +1573,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
 
   Future<void> _completeCarOut(_Vehicle vehicle) async {
-    final originalRef = _firestore
-        .collection('parking_tickets')
+    final originalRef = TenantContext.instance.collection('parking_tickets')
         .doc(vehicle.id);
 
     try {

@@ -1,3 +1,4 @@
+import '../services/tenant_context.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../resources/widget/app_toast.dart';
@@ -681,8 +682,7 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
     BuildContext context,
     LocationModel location,
   ) async {
-    final result = await FirebaseFirestore.instance
-        .collection('parking_tickets')
+    final result = await TenantContext.instance.collection('parking_tickets')
         .where('locationId', isEqualTo: location.id)
         .get();
     final tickets = result.docs.map((doc) => doc.data()).toList();
@@ -1175,8 +1175,7 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
 
               // Real-time active vehicles inside indicator
               StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('parking_tickets')
+                stream: TenantContext.instance.collection('parking_tickets')
                     .where('locationId', isEqualTo: location.id)
                     .where('status', isEqualTo: 'in')
                     .snapshots(),

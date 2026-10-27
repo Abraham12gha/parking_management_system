@@ -1,8 +1,8 @@
+import '../services/tenant_context.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../resources/widget/app_toast.dart';
-import 'add_operator_admin.dart';
 
 class OperatorList extends StatefulWidget {
   const OperatorList({super.key, required this.onAddOperator});
@@ -90,8 +90,7 @@ class _OperatorListState extends State<OperatorList> {
     }
 
     // Fetch from Firestore
-    final request = FirebaseFirestore.instance
-        .collection('locations')
+    final request = TenantContext.instance.collection('locations')
         .doc(locationId)
         .get()
         .then((snapshot) {
@@ -161,8 +160,7 @@ class _OperatorListState extends State<OperatorList> {
 
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
+                  stream: TenantContext.instance.collection('users')
                       .where('role', isEqualTo: _operatorRole)
                       .snapshots(),
 
@@ -377,11 +375,19 @@ class _OperatorListState extends State<OperatorList> {
         const SizedBox(height: 12),
 
         Expanded(
-          child: ListView.separated(
-            itemCount: documents.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return _buildOperatorCard(context, documents[index]);
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 980 ? 2 : 1;
+              return GridView.builder(
+                itemCount: documents.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  mainAxisExtent: 124,
+                ),
+                itemBuilder: (context, index) => _buildOperatorCard(context, documents[index]),
+              );
             },
           ),
         ),
@@ -444,20 +450,20 @@ class _OperatorListState extends State<OperatorList> {
       margin: EdgeInsets.zero,
       color: colors.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           color: colors.outlineVariant.withOpacity(0.6),
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(14),
         child: Row(
           children: [
             // --------------------------------------------------------
             // OPERATOR AVATAR
             // --------------------------------------------------------
             CircleAvatar(
-              radius: 28,
+              radius: 23,
               backgroundColor: isDisabled
                   ? colors.surfaceContainerHighest
                   : colors.primaryContainer,
@@ -472,7 +478,7 @@ class _OperatorListState extends State<OperatorList> {
               ),
             ),
 
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
 
             // --------------------------------------------------------
             // OPERATOR INFORMATION
@@ -537,7 +543,7 @@ class _OperatorListState extends State<OperatorList> {
       ),
             ),
 
-            const SizedBox(width: 16),
+            const SizedBox(width: 8),
 
             // --------------------------------------------------------
             // ACTIONS
@@ -1168,11 +1174,97 @@ class _OperatorListState extends State<OperatorList> {
   // EDIT
   // ================================================================
 
-  void _editOperator(
+  Future<void> _editOperator(
     BuildContext context,
     QueryDocumentSnapshot<Map<String, dynamic>> document,
-  ) {
-    AppToast.information(context, 'Edit operator', 'This action is not available yet.');
+  ) async {
+    final data = document.data();
+    final firstName = (data['firstName'] ?? '').toString().trim();
+    final lastName = (data['lastName'] ?? '').toString().trim();
+    final nameController = TextEditingController(text: '$firstName $lastName'.trim());
+    QuerySnapshot<Map<String, dynamic>> locations;
+    try {
+      locations = await TenantContext.instance.collection('locations').orderBy('locationName').get();
+    } catch (error) {
+      nameController.dispose();
+      if (context.mounted) AppToast.error(context, 'Could not load locations', '$error');
+      return;
+    }
+    if (!context.mounted) {
+      nameController.dispose();
+      return;
+    }
+    final formKey = GlobalKey<FormState>();
+    var selectedLocation = (data['location'] ?? '').toString();
+    var saving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Edit operator'),
+          content: SizedBox(
+            width: 440,
+            child: Form(
+              key: formKey,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Operator name', prefixIcon: Icon(Icons.person_outline)),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Enter an operator name' : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  initialValue: (data['email'] ?? '').toString(),
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined), helperText: 'Email changes require a secure account verification flow.'),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  value: selectedLocation.isEmpty || locations.docs.any((doc) => doc.id == selectedLocation) ? selectedLocation : null,
+                  decoration: const InputDecoration(labelText: 'Assigned location', prefixIcon: Icon(Icons.location_on_outlined)),
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('No location')),
+                    ...locations.docs.map((doc) => DropdownMenuItem(
+                      value: doc.id,
+                      child: Text((doc.data()['locationName'] ?? 'Location').toString(), overflow: TextOverflow.ellipsis),
+                    )),
+                  ],
+                  onChanged: saving ? null : (value) => setDialogState(() => selectedLocation = value ?? ''),
+                ),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: saving ? null : () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+            FilledButton.icon(
+              onPressed: saving ? null : () async {
+                if (!(formKey.currentState?.validate() ?? false)) return;
+                setDialogState(() => saving = true);
+                try {
+                  await TenantContext.instance.collection('users').doc(document.id).update({
+                    'firstName': nameController.text.trim(),
+                    'lastName': '',
+                    'location': selectedLocation,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                  if (!dialogContext.mounted) return;
+                  Navigator.of(dialogContext).pop();
+                  if (mounted) AppToast.success(context, 'Operator updated', 'Profile changes have been saved.');
+                } catch (error) {
+                  if (dialogContext.mounted) AppToast.error(dialogContext, 'Could not update operator', '$error');
+                } finally {
+                  if (dialogContext.mounted) setDialogState(() => saving = false);
+                }
+              },
+              icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded),
+              label: Text(saving ? 'Saving…' : 'Save changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+    nameController.dispose();
   }
 
   // ================================================================
@@ -1291,7 +1383,18 @@ class _OperatorListState extends State<OperatorList> {
     }
 
     try {
-      await document.reference.update({'disabled': !currentlyDisabled});
+      final disabled = !currentlyDisabled;
+      final batch = FirebaseFirestore.instance.batch();
+      batch.update(document.reference, {
+        'disabled': disabled,
+        'status': disabled ? 'disabled' : 'active',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      batch.update(TenantContext.instance.membershipDocument(document.id), {
+        'status': disabled ? 'disabled' : 'active',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
 
       if (!context.mounted) {
         return;
@@ -1357,7 +1460,10 @@ class _OperatorListState extends State<OperatorList> {
     }
 
     try {
-      await document.reference.delete();
+      final batch = FirebaseFirestore.instance.batch();
+      batch.delete(document.reference);
+      batch.delete(TenantContext.instance.membershipDocument(document.id));
+      await batch.commit();
 
       if (!context.mounted) {
         return;

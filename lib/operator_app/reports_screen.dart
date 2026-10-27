@@ -1,12 +1,17 @@
+import '../services/tenant_context.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../resources/widget/app_toast.dart';
 import '../app_model/parking_ticket_model.dart';
 import '../services/app_data_cache.dart';
 import '../services/report_download.dart';
 
-enum ReportDateFilter { today, yesterday, thisWeek, thisMonth, custom }
+enum ReportDateFilter { today, yesterday, thisWeek, thisMonth, thisYear, custom }
 
 class ReportsScreen extends StatefulWidget {
   final String? locationIdOverride;
@@ -36,6 +41,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   List<ParkingTicketModel> _allTickets = [];
   bool _isLoading = false;
+  Timer? _reportRolloverTimer;
+  int _savedReportVersion = 0;
 
   @override
   void initState() {
@@ -48,10 +55,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
     });
 
     _loadData();
+    _scheduleReportRollover();
   }
 
   @override
   void dispose() {
+    _reportRolloverTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -71,7 +80,158 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _allTickets = tickets;
         _isLoading = false;
       });
+      try {
+        await _ensureAutomaticReports(tickets);
+      } catch (error) {
+        debugPrint('Automatic report save failed: $error');
+        if (mounted) AppToast.error(context, 'Automatic report save failed', '$error');
+      }
     }
+  }
+
+  void _scheduleReportRollover() {
+    _reportRolloverTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    _reportRolloverTimer = Timer(nextMidnight.difference(now) + const Duration(seconds: 1), () async {
+      if (!mounted) return;
+      await _loadData();
+      if (mounted) _scheduleReportRollover();
+    });
+  }
+
+  bool _ownsEntry(ParkingTicketModel ticket) {
+    if (_isAdminReport || _cache.userRole != 'operator') return true;
+    final id = ticket.entryOperatorId.isNotEmpty ? ticket.entryOperatorId : ticket.operatorId;
+    return id == _cache.operatorId;
+  }
+
+  bool _ownsExit(ParkingTicketModel ticket) {
+    if (_isAdminReport || _cache.userRole != 'operator') return true;
+    final id = ticket.exitOperatorId.isNotEmpty ? ticket.exitOperatorId : ticket.operatorId;
+    return id == _cache.operatorId;
+  }
+
+  bool _dateIsWithin(DateTime? value, DateTime start, DateTime end) =>
+      value != null && !value.isBefore(start) && !value.isAfter(end);
+
+  List<ParkingTicketModel> _ticketsForPeriod(List<ParkingTicketModel> tickets, DateTime start, DateTime end) {
+    return tickets.where((ticket) {
+      final entryMatches = _ownsEntry(ticket) && _dateIsWithin(ticket.startTime?.toDate(), start, end);
+      final exitMatches = _ownsExit(ticket) && _dateIsWithin(ticket.endTime?.toDate(), start, end);
+      return entryMatches || exitMatches;
+    }).toList();
+  }
+
+  Future<void> _ensureAutomaticReports(List<ParkingTicketModel> tickets) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+    final thisMonthStart = DateTime(now.year, now.month, 1);
+    final lastYearStart = DateTime(now.year - 1, 1, 1);
+    final thisYearStart = DateTime(now.year, 1, 1);
+    final scope = _isAdminReport ? 'admin' : userId;
+    final audience = _isAdminReport ? 'admin' : 'operator';
+    final firestore = FirebaseFirestore.instance;
+    final stateRef = TenantContext.instance.collection('report_states').doc(scope);
+    final stateSnapshot = await stateRef.get();
+    final savedState = stateSnapshot.data() ?? <String, dynamic>{};
+
+    final eventTimes = <DateTime>[];
+    for (final ticket in tickets) {
+      if (_ownsEntry(ticket) && ticket.startTime != null) eventTimes.add(ticket.startTime!.toDate());
+      if (_ownsExit(ticket) && ticket.endTime != null) eventTimes.add(ticket.endTime!.toDate());
+    }
+    eventTimes.sort();
+    final firstEvent = eventTimes.isEmpty ? yesterday : eventTimes.first;
+    final firstEventDay = DateTime(firstEvent.year, firstEvent.month, firstEvent.day);
+    DateTime startingAtOrBefore(DateTime lastPeriod) => firstEventDay.isBefore(lastPeriod) ? firstEventDay : lastPeriod;
+
+    DateTime dailyStart = DateTime.tryParse((savedState['dailyThrough'] ?? '').toString())
+            ?.add(const Duration(days: 1)) ??
+        startingAtOrBefore(yesterday);
+    DateTime monthlyStart;
+    final monthCheckpoint = (savedState['monthlyThrough'] ?? '').toString().split('-');
+    if (monthCheckpoint.length == 2) {
+      monthlyStart = DateTime((int.tryParse(monthCheckpoint[0]) ?? now.year), (int.tryParse(monthCheckpoint[1]) ?? now.month) + 1, 1);
+    } else {
+      monthlyStart = startingAtOrBefore(lastMonthStart);
+      monthlyStart = DateTime(monthlyStart.year, monthlyStart.month, 1);
+    }
+    final yearCheckpoint = int.tryParse((savedState['yearlyThrough'] ?? '').toString());
+    final yearlyStart = yearCheckpoint == null
+        ? DateTime(startingAtOrBefore(lastYearStart).year, 1, 1)
+        : DateTime(yearCheckpoint + 1, 1, 1);
+
+    final periods = <({String type, DateTime start, DateTime end})>[];
+    while (!dailyStart.isAfter(yesterday)) {
+      final endExclusive = dailyStart.add(const Duration(days: 1));
+      periods.add((type: 'daily', start: dailyStart, end: endExclusive.subtract(const Duration(microseconds: 1))));
+      dailyStart = endExclusive;
+    }
+    while (monthlyStart.isBefore(thisMonthStart)) {
+      final endExclusive = DateTime(monthlyStart.year, monthlyStart.month + 1, 1);
+      periods.add((type: 'monthly', start: monthlyStart, end: endExclusive.subtract(const Duration(microseconds: 1))));
+      monthlyStart = endExclusive;
+    }
+    var yearlyStartCursor = yearlyStart;
+    while (yearlyStartCursor.isBefore(thisYearStart)) {
+      final endExclusive = DateTime(yearlyStartCursor.year + 1, 1, 1);
+      periods.add((type: 'yearly', start: yearlyStartCursor, end: endExclusive.subtract(const Duration(microseconds: 1))));
+      yearlyStartCursor = endExclusive;
+    }
+
+    final missingPeriods = <({String type, DateTime start, DateTime end})>[];
+    const checkChunkSize = 25;
+    for (var offset = 0; offset < periods.length; offset += checkChunkSize) {
+      final chunk = periods.skip(offset).take(checkChunkSize).toList();
+      final checks = await Future.wait(chunk.map((period) {
+        final id = '${scope}_${DateFormat('yyyyMMdd').format(period.start)}_${period.type}';
+        return TenantContext.instance.collection('saved_reports').doc(id).get();
+      }));
+      for (var index = 0; index < chunk.length; index++) {
+        if (!checks[index].exists) missingPeriods.add(chunk[index]);
+      }
+    }
+
+    var batch = firestore.batch();
+    var batchCount = 0;
+    for (final period in missingPeriods) {
+      final startKey = DateFormat('yyyy-MM-dd').format(period.start);
+      final filename = 'parking_${audience}_${period.type}_${DateFormat('yyyyMMdd').format(period.start)}.csv';
+      final docId = '${scope}_${DateFormat('yyyyMMdd').format(period.start)}_${period.type}';
+      final reportRef = TenantContext.instance.collection('saved_reports').doc(docId);
+      final periodTickets = _ticketsForPeriod(tickets, period.start, period.end);
+      batch.set(reportRef, {
+        'audience': audience,
+        'operatorId': _isAdminReport ? '' : userId,
+        'locationId': widget.locationIdOverride ?? _cache.locationId ?? '',
+        'filename': filename,
+        'period': '${DateFormat('yyyy-MM-dd').format(period.start)} to ${DateFormat('yyyy-MM-dd').format(period.end)}',
+        'periodType': period.type,
+        'periodStart': startKey,
+        'periodEnd': DateFormat('yyyy-MM-dd').format(period.end),
+        'csv': _buildReportCsv(periodTickets),
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': userId,
+      });
+      batchCount++;
+      if (batchCount == 450) {
+        await batch.commit();
+        batch = firestore.batch();
+        batchCount = 0;
+      }
+    }
+    if (batchCount > 0) await batch.commit();
+    await stateRef.set({
+      'dailyThrough': DateFormat('yyyy-MM-dd').format(yesterday),
+      'monthlyThrough': DateFormat('yyyy-MM').format(lastMonthStart),
+      'yearlyThrough': '${now.year - 1}',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    if (missingPeriods.isNotEmpty && mounted) setState(() => _savedReportVersion++);
   }
 
   // -------------------------------------------------------------
@@ -83,7 +243,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart
         .add(const Duration(days: 1))
-        .subtract(const Duration(milliseconds: 1));
+        .subtract(const Duration(microseconds: 1));
 
     switch (_dateFilter) {
       case ReportDateFilter.today:
@@ -91,7 +251,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       case ReportDateFilter.yesterday:
         final yestStart = todayStart.subtract(const Duration(days: 1));
-        final yestEnd = todayStart.subtract(const Duration(milliseconds: 1));
+        final yestEnd = todayStart.subtract(const Duration(microseconds: 1));
         return DateTimeRange(start: yestStart, end: yestEnd);
 
       case ReportDateFilter.thisWeek:
@@ -104,6 +264,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         final monthStart = DateTime(now.year, now.month, 1);
         return DateTimeRange(start: monthStart, end: todayEnd);
 
+      case ReportDateFilter.thisYear:
+        return DateTimeRange(start: DateTime(now.year, 1, 1), end: todayEnd);
+
       case ReportDateFilter.custom:
         final start = DateTime(
           _customStartDate.year,
@@ -114,11 +277,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           _customEndDate.year,
           _customEndDate.month,
           _customEndDate.day,
-          23,
-          59,
-          59,
-          999,
-        );
+        ).add(const Duration(days: 1)).subtract(const Duration(microseconds: 1));
         return DateTimeRange(start: start, end: end);
     }
   }
@@ -135,20 +294,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ? _cache.operatorId
           : null;
       final isInside = ticket.status.toLowerCase() == 'in';
-      final attributedOperator = isInside
-          ? ticket.entryOperatorId
-          : (ticket.exitOperatorId.isNotEmpty
-                ? ticket.exitOperatorId
-                : ticket.operatorId); // legacy completed tickets
-      if (operatorId != null && attributedOperator != operatorId) return false;
-
-      // 1. Date Filter
-      final ticketTime =
-          (isInside ? ticket.startTime : ticket.endTime)?.toDate() ??
-          ticket.startTime?.toDate();
-      if (ticketTime == null) return false;
-      if (ticketTime.isBefore(range.start) || ticketTime.isAfter(range.end)) {
-        return false;
+      final entryTime = ticket.startTime?.toDate();
+      final exitTime = ticket.endTime?.toDate();
+      bool inRange(DateTime? value) => value != null && !value.isBefore(range.start) && !value.isAfter(range.end);
+      final entryInRange = inRange(entryTime);
+      final exitInRange = inRange(exitTime);
+      if (!entryInRange && !exitInRange) return false;
+      if (operatorId != null) {
+        final entryOperator = ticket.entryOperatorId.isNotEmpty ? ticket.entryOperatorId : ticket.operatorId;
+        final exitOperator = ticket.exitOperatorId.isNotEmpty ? ticket.exitOperatorId : ticket.operatorId;
+        if (!(entryInRange && entryOperator == operatorId) && !(exitInRange && exitOperator == operatorId)) return false;
       }
 
       // 2. Category Filter
@@ -189,18 +344,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // Summary Aggregates
   // -------------------------------------------------------------
 
-  int get _totalVehicles => _filteredTickets.length;
+  int get _totalVehicles => _filteredTickets.where((t) {
+    final time = t.startTime?.toDate();
+    final range = _getDateRange();
+    return time != null && !time.isBefore(range.start) && !time.isAfter(range.end);
+  }).length;
 
-  int get _activeCount =>
-      _filteredTickets.where((t) => t.status.toLowerCase() == 'in').length;
+  int get _activeCount => _filteredTickets.where((t) => t.status.toLowerCase() == 'in').length;
 
   int get _exitedCount =>
-      _filteredTickets.where((t) => t.status.toLowerCase() != 'in').length;
+      _filteredTickets.where((t) {
+        final end = t.endTime?.toDate();
+        final range = _getDateRange();
+        return t.status.toLowerCase() != 'in' && end != null &&
+            !end.isBefore(range.start) && !end.isAfter(range.end);
+      }).length;
 
   double get _totalRevenue {
     double total = 0;
     for (final t in _filteredTickets) {
-      if (t.status.toLowerCase() != 'in') {
+      final end = t.endTime?.toDate();
+      final range = _getDateRange();
+      if (t.status.toLowerCase() != 'in' && end != null && !end.isBefore(range.start) && !end.isAfter(range.end)) {
         // t.charges already resolves checkoutAmount → finalParkingCharges → charges.
         // Do NOT fall back to t.parkingCharges (the base rate) — that would
         // inflate revenue for vehicles that exited within grace (Rs. 0).
@@ -282,7 +447,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           const SizedBox(height: 12),
 
                           // Data Table
-                          _buildDataTable(theme, filtered),
+                          _isAdminReport
+                              ? _buildAdminSummary(theme, filtered)
+                              : _buildDataTable(theme, filtered),
+
+                          const SizedBox(height: 24),
+                          _buildSavedReports(),
 
                           const SizedBox(height: 40),
                         ],
@@ -396,23 +566,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => _showExportDialog(context),
-                icon: const Icon(Icons.print_rounded, size: 18),
-                label: const Text('Export / Print'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
             ],
           );
           if (!compact) return title;
@@ -458,11 +611,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                   ),
                   const Text('• Live Synced'),
-                  ElevatedButton.icon(
-                    onPressed: () => _showExportDialog(context),
-                    icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text('Export'),
-                  ),
                 ],
               ),
             ],
@@ -591,6 +739,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ReportDateFilter.thisMonth,
                 colorScheme,
               ),
+              _buildDateFilterChip('This Year', ReportDateFilter.thisYear, colorScheme),
               _buildDateFilterChip(
                 'Custom Range',
                 ReportDateFilter.custom,
@@ -896,6 +1045,130 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
       ],
     );
+  }
+
+  bool get _isAdminReport => widget.locationIdOverride == 'ALL';
+
+  String _buildReportCsv(List<ParkingTicketModel> tickets) {
+    final buffer = StringBuffer();
+    if (_isAdminReport) {
+      buffer.writeln('Location,Entries,Exits,Active Vehicles,Revenue (Rs)');
+      final byLocation = <String, List<ParkingTicketModel>>{};
+      for (final ticket in tickets) {
+        byLocation.putIfAbsent(ticket.locationName.isEmpty ? 'Unknown' : ticket.locationName, () => []).add(ticket);
+      }
+      for (final entry in byLocation.entries) {
+        final exits = entry.value.where((t) => t.status.toLowerCase() != 'in').toList();
+        final active = entry.value.length - exits.length;
+        final revenue = exits.fold<double>(0, (sum, t) => sum + t.charges);
+        buffer.writeln([entry.key, entry.value.length, exits.length, active, revenue.toStringAsFixed(2)].map((v) => _csvCell('$v')).join(','));
+      }
+      buffer.writeln();
+      buffer.writeln('Operator,Location,Exits,Revenue (Rs)');
+      final byOperator = <String, List<ParkingTicketModel>>{};
+      for (final ticket in tickets.where((t) => t.status.toLowerCase() != 'in')) {
+        final name = ticket.exitOperatorName.isNotEmpty ? ticket.exitOperatorName : (ticket.entryOperatorName.isNotEmpty ? ticket.entryOperatorName : 'Unknown');
+        byOperator.putIfAbsent('$name|${ticket.locationName}', () => []).add(ticket);
+      }
+      for (final entry in byOperator.entries) {
+        final split = entry.key.split('|');
+        final revenue = entry.value.fold<double>(0, (sum, t) => sum + t.charges);
+        buffer.writeln([split.first, split.length > 1 ? split.last : '', entry.value.length, revenue.toStringAsFixed(2)].map((v) => _csvCell('$v')).join(','));
+      }
+      return buffer.toString();
+    }
+
+    buffer.writeln('Ticket,Vehicle,Category,Valet Driver,Entry Time,Exit Time,Entry Operator,Exit Operator,Amount (Rs),Payment');
+    for (final ticket in tickets) {
+      final inside = ticket.status.toLowerCase() == 'in';
+      final amount = inside ? 0.0 : ticket.charges;
+      final values = [ticket.ticketNumber, ticket.vehicleNumber, ticket.vehicleCategory, ticket.vehicleCategory.toLowerCase() == 'valet' ? ticket.driverName : '', ticket.startTime == null ? '' : DateFormat('yyyy-MM-dd HH:mm').format(ticket.startTime!.toDate()), inside || ticket.endTime == null ? '' : DateFormat('yyyy-MM-dd HH:mm').format(ticket.endTime!.toDate()), ticket.entryOperatorName, ticket.exitOperatorName, inside ? '' : amount.toStringAsFixed(2), inside ? 'Pending' : (amount == 0 ? 'Free' : 'Paid')];
+      buffer.writeln(values.map((v) => _csvCell('$v')).join(','));
+    }
+    return buffer.toString();
+  }
+
+  Widget _buildAdminSummary(ThemeData theme, List<ParkingTicketModel> tickets) {
+    final byLocation = <String, List<ParkingTicketModel>>{};
+    for (final ticket in tickets) {
+      byLocation.putIfAbsent(ticket.locationName.isEmpty ? 'Unknown location' : ticket.locationName, () => []).add(ticket);
+    }
+    if (byLocation.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No activity in this period.')));
+    return Card(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(columns: const [
+          DataColumn(label: Text('Location')),
+          DataColumn(label: Text('Entries')),
+          DataColumn(label: Text('Exits')),
+          DataColumn(label: Text('Currently inside')),
+          DataColumn(label: Text('Revenue')),
+        ], rows: byLocation.entries.map((entry) {
+          final exited = entry.value.where((t) => t.status.toLowerCase() != 'in').toList();
+          final range = _getDateRange();
+          final exitCount = exited.where((t) {
+            final end = t.endTime?.toDate();
+            return end != null && !end.isBefore(range.start) && !end.isAfter(range.end);
+          }).length;
+          final entryCount = entry.value.where((t) {
+            final start = t.startTime?.toDate();
+            return start != null && !start.isBefore(range.start) && !start.isAfter(range.end);
+          }).length;
+          final inside = entry.value.where((t) => t.status.toLowerCase() == 'in').length;
+          final revenue = exited.where((t) {
+            final end = t.endTime?.toDate();
+            return end != null && !end.isBefore(range.start) && !end.isAfter(range.end);
+          }).fold<double>(0, (sum, t) => sum + t.charges);
+          return DataRow(cells: [
+            DataCell(Text(entry.key)),
+            DataCell(Text('$entryCount')),
+            DataCell(Text('$exitCount')),
+            DataCell(Text('$inside')),
+            DataCell(Text('Rs. ${NumberFormat('#,##0').format(revenue)}')),
+          ]);
+        }).toList()),
+      ),
+    );
+  }
+
+  Widget _buildSavedReports() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return const SizedBox.shrink();
+    Query<Map<String, dynamic>> query = TenantContext.instance.collection('saved_reports');
+    query = _isAdminReport
+        ? query.where('audience', isEqualTo: 'admin')
+        : query.where('audience', isEqualTo: 'operator').where('operatorId', isEqualTo: userId);
+    return _SavedReportsPanel(key: ValueKey('$userId-$_savedReportVersion'), query: query, onPreview: _previewSavedReport, onDownload: _downloadSavedReport);
+  }
+
+  Future<void> _previewSavedReport(String filename, String csv) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(filename, maxLines: 1, overflow: TextOverflow.ellipsis),
+        content: SizedBox(
+          width: 850,
+          height: 520,
+          child: DecoratedBox(
+            decoration: BoxDecoration(color: Theme.of(dialogContext).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
+              child: SelectableText(csv, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.5)),
+            ),
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Close'))],
+      ),
+    );
+  }
+
+  Future<void> _downloadSavedReport(String filename, String csv) async {
+    try {
+      final path = await downloadReport(filename, csv);
+      if (mounted) AppToast.success(context, 'Report downloaded', path);
+    } catch (e) {
+      if (mounted) AppToast.error(context, 'Could not download report', '$e');
+    }
   }
 
   // -------------------------------------------------------------
@@ -1474,145 +1747,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  void _showExportDialog(BuildContext context) {
-    final filtered = _filteredTickets;
-    final range = _getDateRange();
-    final dateRangeStr =
-        '${DateFormat('MMM dd, yyyy').format(range.start)} - ${DateFormat('MMM dd, yyyy').format(range.end)}';
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.print, color: Color(0xFF1B5E20)),
-              SizedBox(width: 10),
-              Text(
-                'Audit Report Summary',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.green.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'REPORT OVERVIEW',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            color: Color(0xFF1B5E20),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Period: $dateRangeStr',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text('Total Registered Vehicles: ${filtered.length}'),
-                        Text('Completed Exits: $_exitedCount'),
-                        Text('Currently Active: $_activeCount'),
-                        Text(
-                          'Total Revenue Collected: Rs. ${NumberFormat('#,##0').format(_totalRevenue)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1B5E20),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Summary text copied to clipboard can be printed or pasted directly into Excel / Google Sheets.',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Close'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final buffer = StringBuffer();
-                buffer.writeln(
-                  'Ticket,Vehicle,Category,Entry,Exit,Charges,Status,Entry Gate,Exit Gate',
-                );
-                for (final t in filtered) {
-                  final s = t.startTime?.toDate() != null
-                      ? DateFormat(
-                          'yyyy-MM-dd HH:mm',
-                        ).format(t.startTime!.toDate())
-                      : '--';
-                  final e = t.endTime?.toDate() != null
-                      ? DateFormat(
-                          'yyyy-MM-dd HH:mm',
-                        ).format(t.endTime!.toDate())
-                      : 'INSIDE';
-                  final c = t.charges > 0 ? t.charges : t.parkingCharges;
-                  final values = [
-                    t.ticketNumber,
-                    t.vehicleNumber,
-                    t.vehicleCategory,
-                    s,
-                    e,
-                    t.status.toLowerCase() == 'in' ? '' : c.toStringAsFixed(2),
-                    t.status,
-                    t.entryOperatorId,
-                    t.exitOperatorId,
-                  ];
-                  buffer.writeln(values.map(_csvCell).join(','));
-                }
-                try {
-                  final filename =
-                      'parking_report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
-                  final savedTo = await downloadReport(
-                    filename,
-                    buffer.toString(),
-                  );
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  AppToast.success(context, 'Report downloaded', savedTo);
-                } catch (e) {
-                  if (!ctx.mounted) return;
-                  AppToast.error(context, 'Could not download report', '$e');
-                }
-              },
-              icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text('Download CSV'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1B5E20),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   String _csvCell(String value) => '"${value.replaceAll('"', '""')}"';
 
   Widget _receiptRow(String label, String value, {bool isBold = false}) {
@@ -1716,6 +1850,154 @@ class _StatCardItem extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SavedReportsPanel extends StatefulWidget {
+  const _SavedReportsPanel({
+    super.key,
+    required this.query,
+    required this.onPreview,
+    required this.onDownload,
+  });
+
+  final Query<Map<String, dynamic>> query;
+  final Future<void> Function(String filename, String csv) onPreview;
+  final Future<void> Function(String filename, String csv) onDownload;
+
+  @override
+  State<_SavedReportsPanel> createState() => _SavedReportsPanelState();
+}
+
+class _SavedReportsPanelState extends State<_SavedReportsPanel> {
+  static const int _pageSize = 3;
+  final ScrollController _scrollController = ScrollController();
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> _reports = [];
+  QueryDocumentSnapshot<Map<String, dynamic>>? _lastDocument;
+  bool _loading = false;
+  bool _hasMore = true;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_handleScroll);
+    _loadMore();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (_scrollController.hasClients && _scrollController.position.extentAfter < 80) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || !_hasMore) return;
+    setState(() => _loading = true);
+    try {
+      var page = widget.query.orderBy('createdAt', descending: true).limit(_pageSize);
+      if (_lastDocument != null) page = page.startAfterDocument(_lastDocument!);
+      final result = await page.get();
+      if (!mounted) return;
+      setState(() {
+        _reports.addAll(result.docs);
+        if (result.docs.isNotEmpty) _lastDocument = result.docs.last;
+        _hasMore = result.docs.length == _pageSize;
+        _loading = false;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.65)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.folder_copy_outlined, color: colors.primary),
+              const SizedBox(width: 10),
+              Expanded(child: Text('Saved reports', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+              Text('Automatic • Daily, monthly, yearly', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+            ]),
+            const SizedBox(height: 12),
+            if (_error != null)
+              SelectableText(
+                _error is FirebaseException
+                    ? 'Firestore ${(_error as FirebaseException).code}: ${(_error as FirebaseException).message ?? ''}'
+                    : 'Could not load reports: $_error',
+                style: TextStyle(color: colors.error),
+              )
+            else if (_reports.isEmpty && _loading)
+              const SizedBox(height: 4, child: LinearProgressIndicator())
+            else if (_reports.isEmpty)
+              Text('Completed reports will appear here automatically.', style: theme.textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant))
+            else
+              SizedBox(
+                height: 230,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  itemCount: _reports.length + (_loading ? 1 : 0),
+                  separatorBuilder: (_, __) => Divider(height: 1, color: colors.outlineVariant.withValues(alpha: 0.5)),
+                  itemBuilder: (context, index) {
+                    if (index >= _reports.length) {
+                      return const SizedBox(height: 56, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+                    }
+                    final data = _reports[index].data();
+                    final name = (data['filename'] ?? 'parking_report.csv').toString();
+                    final period = (data['period'] ?? '').toString();
+                    final type = (data['periodType'] ?? 'report').toString();
+                    final csv = (data['csv'] ?? '').toString();
+                    return SizedBox(
+                      height: 82,
+                      child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      leading: CircleAvatar(
+                        backgroundColor: colors.primaryContainer,
+                        foregroundColor: colors.onPrimaryContainer,
+                        child: Icon(type == 'daily' ? Icons.today_outlined : type == 'monthly' ? Icons.date_range_rounded : Icons.calendar_today_outlined),
+                      ),
+                      title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text('$period  •  ${type[0].toUpperCase()}${type.substring(1)}'),
+                      trailing: Wrap(spacing: 2, children: [
+                        IconButton(tooltip: 'Preview report', onPressed: () => widget.onPreview(name, csv), icon: const Icon(Icons.visibility_outlined)),
+                        IconButton(tooltip: 'Download report', onPressed: () => widget.onDownload(name, csv), icon: const Icon(Icons.download_outlined)),
+                      ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: () { setState(() { _error = null; _hasMore = true; }); _loadMore(); }, icon: const Icon(Icons.refresh), label: const Text('Retry'))),
+            ],
+          ],
+        ),
       ),
     );
   }

@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:parking_management_system/services/auth.dart';
-import 'package:parking_management_system/services/company_settings_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final Auth _auth = Auth();
 
-  String _companyName = 'Pakistan Valet Solution';
+  String _companyName = 'Parking Management';
   String? _logoUrl;
 
   bool _isLoading = false;
@@ -36,41 +35,25 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _emailError;
   String? _passwordError;
 
+  Future<void> _showCreateCompanyDialog() async {
+    final initialAdminEmail = _emailController.text.trim();
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _CreateCompanyDialog(
+        initialAdminEmail: initialAdminEmail,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     loadAppVersion();
-    _loadCompanySettings();
-  }
-
-  Future<void> _loadCompanySettings() async {
-    try {
-      final settings = await CompanySettingsService.instance.getSettings();
-
-      if (!mounted) return;
-
-      setState(() {
-        _companyName = settings.appName.isNotEmpty
-            ? settings.appName
-            : 'Pakistan Valet Solution';
-
-        _logoUrl = settings.logoUrl;
-      });
-    } catch (e) {
-      debugPrint('Could not load company settings: $e');
-
-      // Keep default values.
-      if (!mounted) return;
-
-      setState(() {
-        _companyName = 'Pakistan Valet Solution';
-        _logoUrl = null;
-      });
-    }
   }
 
   Future<void> loadAppVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
+    if (!mounted) return;
 
     setState(() {
       appVersion = packageInfo.version;
@@ -464,6 +447,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : _showCreateCompanyDialog,
+                          child: const Text('Create a company account'),
+                        ),
                         const SizedBox(height: 30),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -486,6 +476,144 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CreateCompanyDialog extends StatefulWidget {
+  const _CreateCompanyDialog({required this.initialAdminEmail});
+
+  final String initialAdminEmail;
+
+  @override
+  State<_CreateCompanyDialog> createState() => _CreateCompanyDialogState();
+}
+
+class _CreateCompanyDialogState extends State<_CreateCompanyDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _companyController;
+  late final TextEditingController _emailController;
+  final _passwordController = TextEditingController();
+  String _billingCycle = 'monthly';
+  bool _saving = false;
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _companyController = TextEditingController();
+    _emailController = TextEditingController(text: widget.initialAdminEmail);
+  }
+
+  @override
+  void dispose() {
+    _companyController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createCompany() async {
+    if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _saving = true);
+    try {
+      await Auth().registerCompanyAdmin(
+        companyName: _companyController.text,
+        email: _emailController.text,
+        password: _passwordController.text,
+        billingCycle: _billingCycle,
+      );
+      if (!mounted) return;
+      _closing = true;
+      Navigator.of(context).pop();
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? 'Could not create account.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    } finally {
+      if (mounted && !_closing) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('Create a company account'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _companyController,
+                  decoration: const InputDecoration(labelText: 'Company name'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a company name'
+                      : null,
+                ),
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Admin email'),
+                  validator: (value) => value == null || !value.contains('@')
+                      ? 'Enter a valid email'
+                      : null,
+                ),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                  validator: (value) => value == null || value.length < 6
+                      ? 'Use at least 6 characters'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _billingCycle,
+                  decoration: const InputDecoration(
+                    labelText: 'Selected billing cycle',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'monthly', child: Text('Monthly — \$50 / month')),
+                    DropdownMenuItem(value: 'yearly', child: Text('Yearly — \$600 / year')),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(
+                          () => _billingCycle = value ?? 'monthly',
+                        ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Payment is recorded as pending. This free-tier app does not process or verify payments.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _createCompany,
+          child: Text(_saving ? 'Creating…' : 'Create company'),
+        ),
+      ],
     );
   }
 }
