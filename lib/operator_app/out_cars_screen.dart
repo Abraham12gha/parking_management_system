@@ -834,38 +834,35 @@ class _OutCarCard extends StatelessWidget {
     final isFree = charge == 0;
     final fmt = DateFormat('dd MMM yyyy, hh:mm a');
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          minChildSize: 0.3,
-          maxChildSize: 0.85,
-          expand: false,
-          builder: (context, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: colorScheme.outline.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Vehicle Details',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.onSurface),
+                        ),
                       ),
-                    ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
                   ),
-
                   // Title
                   Row(
                     children: [
@@ -970,8 +967,14 @@ class _OutCarCard extends StatelessWidget {
                   _detailRow(context, Icons.timer_outlined, 'Duration', durationStr),
                   _detailRow(context, Icons.category_outlined, 'Category', ticket.vehicleCategory),
                   _detailRow(context, Icons.location_on_outlined, 'Location', ticket.locationName),
-                  _detailRow(context, Icons.person_outline_rounded, 'Driver',
-                      ticket.driverName.isEmpty ? '--' : ticket.driverName),
+                  if (ticket.vehicleCategory.toLowerCase() == 'valet') ...[
+                    _detailRow(context, Icons.login_rounded, 'Driver at Entry',
+                        ticket.entryDriverName.isEmpty ? ticket.driverName : ticket.entryDriverName),
+                    _detailRow(context, Icons.logout_rounded, 'Driver at Exit',
+                        ticket.exitDriverName.isEmpty ? '--' : ticket.exitDriverName),
+                  ] else
+                    _detailRow(context, Icons.person_outline_rounded, 'Driver',
+                        ticket.driverName.isEmpty ? '--' : ticket.driverName),
                   _detailRow(context, Icons.phone_outlined, 'Phone',
                       ticket.phoneNumber.isEmpty ? '--' : ticket.phoneNumber),
                   _detailRow(context, Icons.attach_money_rounded, 'Base Rate',
@@ -986,10 +989,11 @@ class _OutCarCard extends StatelessWidget {
                     _detailRow(context, Icons.notes_rounded, 'Notes', ticket.notes),
 
                   const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                 ],
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
