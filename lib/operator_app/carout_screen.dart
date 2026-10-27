@@ -1421,6 +1421,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final driverNameController = TextEditingController(
+      text: vehicle.driverName,
+    );
 
     bool isProcessing = false;
 
@@ -1447,6 +1450,19 @@ class _CaroutScreenState extends State<CaroutScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
+                  if (vehicle.category.toLowerCase() == 'valet') ...[
+                    TextField(
+                      controller: driverNameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Valet Driver Name *',
+                        hintText: 'Enter the driver taking the car out',
+                        prefixIcon: Icon(Icons.person_outline_rounded),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(13),
@@ -1530,7 +1546,20 @@ class _CaroutScreenState extends State<CaroutScreen> {
                           });
 
                           try {
-                            await _completeCarOut(vehicle);
+                            final driverName = driverNameController.text.trim();
+                            if (vehicle.category.toLowerCase() == 'valet' &&
+                                driverName.isEmpty) {
+                              setDialogState(() {
+                                isProcessing = false;
+                              });
+                              _showError('Enter the valet driver name to continue.');
+                              return;
+                            }
+
+                            await _completeCarOut(
+                              vehicle,
+                              driverName: driverName,
+                            );
 
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);
@@ -1557,7 +1586,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
           },
         );
       },
-    );
+    ).whenComplete(driverNameController.dispose);
   }
 
   // ===========================================================================
@@ -1572,7 +1601,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // If anything fails, Firestore rolls back the transaction.
   // ===========================================================================
 
-  Future<void> _completeCarOut(_Vehicle vehicle) async {
+  Future<void> _completeCarOut(
+    _Vehicle vehicle, {
+    required String driverName,
+  }) async {
     final originalRef = TenantContext.instance.collection('parking_tickets')
         .doc(vehicle.id);
 
@@ -1609,6 +1641,13 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
         if (currentStatus != 'in') {
           throw Exception('This vehicle has already been checked out.');
+        }
+
+        final isValet =
+            originalData['vehicleCategory']?.toString().toLowerCase() ==
+                'valet';
+        if (isValet && driverName.trim().isEmpty) {
+          throw Exception('Enter the valet driver name to continue.');
         }
 
         // --------------------------------------------------------------
@@ -1656,6 +1695,12 @@ class _CaroutScreenState extends State<CaroutScreen> {
         // --------------------------------------------------------------
 
         final backupData = Map<String, dynamic>.from(originalData);
+        if (isValet) {
+          // Keep driverName as the entry driver for older reports and clients.
+          backupData['entryDriverName'] =
+              originalData['entryDriverName'] ?? originalData['driverName'] ?? '';
+          backupData['exitDriverName'] = driverName.trim();
+        }
 
         // --------------------------------------------------------------
         // Keep the original document id so reports can read completed
