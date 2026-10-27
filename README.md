@@ -1,5 +1,6 @@
 <div align="center">
-  
+  <img src="assets/images/PVS_LOGO.png" alt="Parking Management" width="112" />
+
   # Parking Management System
 
   **A multi-company parking operations app built with Flutter and Firebase.**
