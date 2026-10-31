@@ -6,6 +6,7 @@ class LocationModel {
     required this.address,
     required this.parkingCharges,
     this.graceTimeSeconds = 0,
+    this.extraGraceTimeMinutes = 0,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class LocationModel {
   final String address;
   final int parkingCharges;
   final int graceTimeSeconds;
+  final int extraGraceTimeMinutes;
 
   factory LocationModel.fromFirestore(
     String id,
@@ -22,6 +24,7 @@ class LocationModel {
     final dynamic numId = data['id'];
     final dynamic charges = data['parkingCharges'];
     final dynamic grace = data['graceTimeSeconds'];
+    final dynamic extraGrace = data['extraGraceTimeMinutes'];
 
     return LocationModel(
       id: id,
@@ -30,6 +33,7 @@ class LocationModel {
       address: data['address'] as String? ?? '',
       parkingCharges: charges is num ? charges.toInt() : int.tryParse(charges?.toString() ?? '') ?? 0,
       graceTimeSeconds: grace is num ? grace.toInt() : int.tryParse(grace?.toString() ?? '') ?? 0,
+      extraGraceTimeMinutes: extraGrace is num ? extraGrace.toInt() : int.tryParse(extraGrace?.toString() ?? '') ?? 0,
     );
   }
 
@@ -40,6 +44,7 @@ class LocationModel {
     String? address,
     int? parkingCharges,
     int? graceTimeSeconds,
+    int? extraGraceTimeMinutes,
   }) {
     return LocationModel(
       id: id ?? this.id,
@@ -48,6 +53,7 @@ class LocationModel {
       address: address ?? this.address,
       parkingCharges: parkingCharges ?? this.parkingCharges,
       graceTimeSeconds: graceTimeSeconds ?? this.graceTimeSeconds,
+      extraGraceTimeMinutes: extraGraceTimeMinutes ?? this.extraGraceTimeMinutes,
     );
   }
 

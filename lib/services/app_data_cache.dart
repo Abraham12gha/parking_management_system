@@ -23,6 +23,7 @@ class AppDataCache {
   int _locationNumericId = 0;
   int _parkingCharges = 0;
   int _graceTimeSeconds = 0;
+  int _extraGraceTimeMinutes = 0;
   String? _userRole;
 
   bool _isLoaded = false;
@@ -30,6 +31,7 @@ class AppDataCache {
 
   final ValueNotifier<bool> isReadyNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<int> graceTimeNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<int> extraGraceTimeNotifier = ValueNotifier<int>(0);
   final ValueNotifier<int> parkingChargesNotifier = ValueNotifier<int>(0);
 
   // Cached Tickets
@@ -51,6 +53,7 @@ class AppDataCache {
   int get locationNumericId => _locationNumericId;
   int get parkingCharges => _parkingCharges;
   int get graceTimeSeconds => _graceTimeSeconds;
+  int get extraGraceTimeMinutes => _extraGraceTimeMinutes;
   String? get userRole => _userRole;
 
   List<ParkingTicketModel> get cachedActiveTickets => _cachedActiveTickets;
@@ -171,18 +174,25 @@ class AppDataCache {
         : int.tryParse(charges?.toString() ?? '') ?? 0;
 
     final dynamic grace = locData['graceTimeSeconds'];
+    final dynamic extraGrace = locData['extraGraceTimeMinutes'];
     final newGrace = grace is num
         ? grace.toInt()
         : int.tryParse(grace?.toString() ?? '') ?? 0;
 
     final bool chargesChanged = _parkingCharges != newCharges;
     final bool graceChanged = _graceTimeSeconds != newGrace;
+    final newExtraGrace = extraGrace is num
+        ? extraGrace.toInt()
+        : int.tryParse(extraGrace?.toString() ?? '') ?? 0;
+    final bool extraGraceChanged = _extraGraceTimeMinutes != newExtraGrace;
+    _extraGraceTimeMinutes = newExtraGrace;
 
     _parkingCharges = newCharges;
     _graceTimeSeconds = newGrace;
 
     if (chargesChanged) parkingChargesNotifier.value = newCharges;
     if (graceChanged) graceTimeNotifier.value = newGrace;
+    if (extraGraceChanged) extraGraceTimeNotifier.value = newExtraGrace;
 
     // Cache into local preferences asynchronously so offline mode is consistent
     _persistPreferences(newCharges, newGrace);
@@ -370,6 +380,7 @@ class AppDataCache {
     _locationNumericId = 0;
     _parkingCharges = 0;
     _graceTimeSeconds = 0;
+    _extraGraceTimeMinutes = 0;
     _userRole = null;
     _isLoaded = false;
     _isLoading = false;
@@ -381,6 +392,7 @@ class AppDataCache {
     _locationSub = null;
     isReadyNotifier.value = false;
     graceTimeNotifier.value = 0;
+    extraGraceTimeNotifier.value = 0;
     parkingChargesNotifier.value = 0;
     activeTicketsNotifier.value = [];
   }

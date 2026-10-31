@@ -42,6 +42,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
     super.initState();
 
     _initializeLocationStream();
+    AppDataCache.instance.extraGraceTimeNotifier.addListener(
+      _onExtraGraceTimeChanged,
+    );
 
     // Refresh duration and calculated amount while the screen is open.
     //
@@ -52,6 +55,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
         setState(() {});
       }
     });
+  }
+
+  void _onExtraGraceTimeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initializeLocationStream() async {
@@ -106,6 +113,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    AppDataCache.instance.extraGraceTimeNotifier.removeListener(
+      _onExtraGraceTimeChanged,
+    );
     _searchController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -765,6 +775,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                 vehicle.startTime!,
                 vehicle.parkingCharges,
                 vehicle.graceTimeSeconds,
+                _effectiveExtraGraceTimeMinutes(vehicle),
               );
 
         return Material(
@@ -1013,6 +1024,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
       startTime,
       vehicle.parkingCharges,
       vehicle.graceTimeSeconds,
+      _effectiveExtraGraceTimeMinutes(vehicle),
     );
 
     final panel = Container(
@@ -1260,6 +1272,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
     final billingPeriods = _billingPeriods(
       vehicle.startTime!,
       vehicle.graceTimeSeconds,
+      _effectiveExtraGraceTimeMinutes(vehicle),
     );
 
     return Container(
@@ -1293,11 +1306,15 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
           const SizedBox(height: 9),
 
-          _chargeRow(theme, 'Extra grace after charge', '15 min'),
+          _chargeRow(
+            theme,
+            'Extra grace per hour',
+            '${_effectiveExtraGraceTimeMinutes(vehicle)} min',
+          ),
 
           const SizedBox(height: 9),
 
-          _chargeRow(theme, 'Billing periods', billingPeriods.toString()),
+          _chargeRow(theme, 'Charge count', billingPeriods.toString()),
 
           const SizedBox(height: 13),
 
@@ -1633,6 +1650,11 @@ class _CaroutScreenState extends State<CaroutScreen> {
           );
         }
 
+        final locationRef = TenantContext.instance
+            .collection('locations')
+            .doc(ticketLocationId);
+        final locationSnapshot = await transaction.get(locationRef);
+
         // --------------------------------------------------------------
         // CHECK STATUS
         // --------------------------------------------------------------
@@ -1661,17 +1683,19 @@ class _CaroutScreenState extends State<CaroutScreen> {
         }
 
         // --------------------------------------------------------------
-        // GET PRICING FROM THE TICKET
-        //
-        // Do NOT use cached operator settings here.
-        //
-        // The ticket contains the pricing snapshot that was
-        // assigned when the car entered.
+        // Use the current location extra grace so admin changes apply to
+        // every active ticket, including cars that entered earlier.
         // --------------------------------------------------------------
 
         final parkingCharge = firestoreDouble(originalData['parkingCharges']);
 
         final graceTimeSeconds = firestoreInt(originalData['graceTimeSeconds']);
+        final locationData = locationSnapshot.data() ?? {};
+        final liveExtraGrace = locationData['extraGraceTimeMinutes'];
+        final extraGraceTimeMinutes = liveExtraGrace is num
+            ? liveExtraGrace.toInt()
+            : int.tryParse(liveExtraGrace?.toString() ?? '') ??
+                  firestoreInt(originalData['extraGraceTimeMinutes']);
 
         // --------------------------------------------------------------
         // CHECKOUT TIME
@@ -1687,6 +1711,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
           startTime,
           parkingCharge,
           graceTimeSeconds,
+          extraGraceTimeMinutes,
           checkoutTime,
         );
 
@@ -1695,6 +1720,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
         // --------------------------------------------------------------
 
         final backupData = Map<String, dynamic>.from(originalData);
+        backupData['extraGraceTimeMinutes'] = extraGraceTimeMinutes;
         if (isValet) {
           // Keep driverName as the entry driver for older reports and clients.
           backupData['entryDriverName'] =
@@ -1802,39 +1828,21 @@ class _CaroutScreenState extends State<CaroutScreen> {
   // ===========================================================================
   // BILLING CALCULATION
   //
-  // EXAMPLE:
-  //
-  // graceTimeSeconds = 5700
-  //                 = 95 minutes
-  //
-  // parkingCharges = 500
-  //
-  // 0 - 94:59     = Rs. 0
-  // 95:00         = Rs. 500
-  // 140:00        = Rs. 1000
-  // 185:00        = Rs. 1500
-  //
-  // After grace:
-  //
-  // First charge happens at the end of grace.
-  //
-  // Next charge:
-  // 30 min parking + 15 min grace = 45 min later.
-  //
+  // Charge once after the initial free grace. Further charges happen just
+  // after each elapsed-hour boundary, delayed by the configured extra grace.
   // ===========================================================================
 
   double _calculateParkingCharge(
     DateTime startTime,
     double parkingCharge,
     int graceTimeSeconds,
+    int extraGraceTimeMinutes,
   ) {
-    final liveGrace = AppDataCache.instance.graceTimeSeconds;
-    final effectiveGrace = graceTimeSeconds > 0 ? graceTimeSeconds : liveGrace;
-
     return _calculateParkingChargeAtTime(
       startTime,
       parkingCharge,
-      effectiveGrace,
+      graceTimeSeconds,
+      extraGraceTimeMinutes,
       DateTime.now(),
     );
   }
@@ -1843,6 +1851,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
     DateTime startTime,
     double parkingCharge,
     int graceTimeSeconds,
+    int extraGraceTimeMinutes,
     DateTime endTime,
   ) {
     if (parkingCharge <= 0) {
@@ -1862,37 +1871,23 @@ class _CaroutScreenState extends State<CaroutScreen> {
     final gracePeriod = Duration(seconds: graceTimeSeconds);
 
     // Vehicle is still FREE.
-    if (elapsed < gracePeriod) {
+    if (elapsed <= gracePeriod) {
       return 0;
     }
 
-    // --------------------------------------------------------------
-    // FIRST CHARGE
-    // --------------------------------------------------------------
-
-    const subsequentBillingWindow = Duration(minutes: 45);
-
-    final timeAfterGrace = elapsed - gracePeriod;
-
-    // Each additional charge occurs every:
-    //
-    // 30 minutes + 15 minutes grace
-    //
-    // = 45 minutes.
-    final additionalCharges =
-        timeAfterGrace.inSeconds ~/ subsequentBillingWindow.inSeconds;
-
-    // First charge + additional charges.
-    final totalCharges = 1 + additionalCharges;
-
-    return parkingCharge * totalCharges;
+    return parkingCharge *
+        _chargeCountAfterFreeGrace(elapsed, extraGraceTimeMinutes);
   }
 
   // ===========================================================================
   // BILLING PERIODS
   // ===========================================================================
 
-  int _billingPeriods(DateTime startTime, int graceTimeSeconds) {
+  int _billingPeriods(
+    DateTime startTime,
+    int graceTimeSeconds,
+    int extraGraceTimeMinutes,
+  ) {
     var elapsed = DateTime.now().difference(startTime);
 
     if (elapsed.isNegative) {
@@ -1902,18 +1897,33 @@ class _CaroutScreenState extends State<CaroutScreen> {
     final gracePeriod = Duration(seconds: graceTimeSeconds);
 
     // Still completely free.
-    if (elapsed < gracePeriod) {
+    if (elapsed <= gracePeriod) {
       return 0;
     }
 
-    const subsequentBillingWindow = Duration(minutes: 45);
+    return _chargeCountAfterFreeGrace(elapsed, extraGraceTimeMinutes);
+  }
 
-    final timeAfterGrace = elapsed - gracePeriod;
-
-    final additionalCharges =
-        timeAfterGrace.inSeconds ~/ subsequentBillingWindow.inSeconds;
-
+  int _chargeCountAfterFreeGrace(Duration elapsed, int extraGraceTimeMinutes) {
+    // First charge is already due once the initial grace has expired.
+    // Additional charges are due just after 1h + extra grace, 2h + extra
+    // grace, and so on. Subtracting one microsecond keeps each boundary
+    // inclusive of its grace window.
+    final extraGraceMicros =
+        extraGraceTimeMinutes.clamp(0, 59) * Duration.microsecondsPerMinute;
+    final microsPastHourlyDelay = elapsed.inMicroseconds - extraGraceMicros - 1;
+    final additionalCharges = microsPastHourlyDelay < Duration.microsecondsPerHour
+        ? 0
+        : microsPastHourlyDelay ~/ Duration.microsecondsPerHour;
     return 1 + additionalCharges;
+  }
+
+  int _effectiveExtraGraceTimeMinutes(_Vehicle vehicle) {
+    final cache = AppDataCache.instance;
+    if (cache.isLoaded && cache.locationId == vehicle.locationId) {
+      return cache.extraGraceTimeMinutes;
+    }
+    return vehicle.extraGraceTimeMinutes;
   }
 
   // ===========================================================================
@@ -2264,6 +2274,7 @@ class _Vehicle {
 
   // Location-specific free grace period.
   final int graceTimeSeconds;
+  final int extraGraceTimeMinutes;
 
   final DateTime? startTime;
 
@@ -2283,6 +2294,7 @@ class _Vehicle {
     required this.notes,
     required this.parkingCharges,
     required this.graceTimeSeconds,
+    required this.extraGraceTimeMinutes,
     required this.startTime,
     required this.status,
     required this.locationId,
@@ -2326,6 +2338,7 @@ class _Vehicle {
       parkingCharges: _toDouble(data['parkingCharges']),
 
       graceTimeSeconds: _toInt(data['graceTimeSeconds']),
+      extraGraceTimeMinutes: _toInt(data['extraGraceTimeMinutes']),
 
       startTime: startTime,
 

@@ -20,6 +20,9 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
   final TextEditingController _parkingChargesController = TextEditingController(
     text: '100',
   );
+  final TextEditingController _extraGraceController = TextEditingController(
+    text: '0',
+  );
 
   // Grace time
   int _graceHours = 0;
@@ -30,6 +33,7 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
     _locationNameController.dispose();
     _addressController.dispose();
     _parkingChargesController.dispose();
+    _extraGraceController.dispose();
     super.dispose();
   }
 
@@ -104,6 +108,7 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
         address: address,
         parkingCharges: parkingCharges,
         graceTimeSeconds: graceTimeSeconds,
+        extraGraceTimeMinutes: int.parse(_extraGraceController.text.trim()),
       );
 
       if (!mounted) return;
@@ -117,6 +122,7 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
       _locationNameController.clear();
       _addressController.clear();
       _parkingChargesController.text = '100';
+      _extraGraceController.text = '0';
 
       setState(() {
         _graceHours = 0;
@@ -758,6 +764,23 @@ class _AddLocationAdminState extends State<AddLocationAdmin> {
           const SizedBox(height: 28),
 
           _graceTime(context),
+          const SizedBox(height: 24),
+          TextFormField(
+            controller: _extraGraceController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Extra grace per hour (minutes)',
+              helperText:
+                  'Applies to cars checked in after this location is created.',
+              prefixIcon: Icon(Icons.more_time),
+            ),
+            validator: (value) {
+              final minutes = int.tryParse(value?.trim() ?? '');
+              return minutes == null || minutes < 0 || minutes > 59
+                  ? 'Enter a value from 0 to 59 minutes'
+                  : null;
+            },
+          ),
         ],
       ),
     );

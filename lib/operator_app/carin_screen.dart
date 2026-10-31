@@ -43,7 +43,11 @@ class _CarinScreenState extends State<CarinScreen> {
   bool _isSaving = false;
   Future<void> _generateTicket() async {
     // Vehicle number is mandatory.
-    final vehicleNumber = _vehicleNumberController.text.trim().toUpperCase();
+    final vehicleNumber = _normalizePlate(_vehicleNumberController.text);
+    _vehicleNumberController.value = TextEditingValue(
+      text: vehicleNumber,
+      selection: TextSelection.collapsed(offset: vehicleNumber.length),
+    );
 
     if (vehicleNumber.isEmpty) {
       AppToast.warning(
@@ -54,14 +58,40 @@ class _CarinScreenState extends State<CarinScreen> {
       return;
     }
 
-    final plateRegex = RegExp(r'^[A-Z]{3}-\d{3,4}$');
-    if (!plateRegex.hasMatch(vehicleNumber)) {
+    if (vehicleNumber.length < 3 ||
+        vehicleNumber.length > 12 ||
+        !RegExp(r'^[A-Z0-9-]+$').hasMatch(vehicleNumber)) {
       AppToast.error(
         context,
         'Check the vehicle number',
-        'Use ABC-123 or ABC-1234 (for example, LEA-123).',
+        'Use 3–12 characters: capital letters, numbers, and dashes only.',
       );
       return;
+    }
+
+    final usualFormat = RegExp(r'^[A-Z]{1,4}-\d{2,5}$');
+    final yearFormat = RegExp(r'^[A-Z]+-\d{2}-\d+$');
+    final isUnusual = !usualFormat.hasMatch(vehicleNumber) &&
+        !yearFormat.hasMatch(vehicleNumber);
+    if (isUnusual) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Unusual plate format'),
+          content: Text('“$vehicleNumber” has an unusual format. Continue anyway?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Go back'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
     }
 
     if (_selectedCategory == VehicleCategory.valetParking &&
@@ -99,6 +129,7 @@ class _CarinScreenState extends State<CarinScreen> {
       final ticketId = await _parkingTicketService.createVehicleEntry(
         vehicleCategory: vehicleCategory,
         vehicleNumber: vehicleNumber,
+        isManualPlate: isUnusual,
         driverName: _driverNameController.text,
         phoneNumber: _phoneNumberController.text,
         notes: _notesController.text,
@@ -214,6 +245,9 @@ class _CarinScreenState extends State<CarinScreen> {
     );
   }
 }
+
+String _normalizePlate(String value) =>
+    value.toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
 // ============================================================
 // Header: title on the left, close (X) button on the right,
@@ -520,8 +554,8 @@ class _VehicleDetailsForm extends StatelessWidget {
                 label: 'Vehicle Number',
                 isRequired: true,
                 controller: vehicleNumberController,
-                hintText: 'ABC-123 or ABC-1234',
-                helperText: 'Required: ABC-123 or ABC-1234',
+                hintText: 'Enter the plate as shown',
+                helperText: '3–12 characters. Unusual formats can be confirmed.',
                 icon: Icons.badge_outlined,
                 inputFormatters: [LicensePlateFormatter()],
                 textCapitalization: TextCapitalization.characters,
@@ -660,58 +694,15 @@ class _FormField extends StatelessWidget {
   }
 }
 
-/// Formatter that automatically forces uppercase and formats license plates
-/// as ABC-123 or ABC-1234.
+/// Formatter that uppercases, removes spaces, and preserves all plate shapes.
 class LicensePlateFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    String text = newValue.text.toUpperCase().replaceAll(
-      RegExp(r'[^A-Z0-9\-]'),
-      '',
-    );
-
-    // Disallow leading hyphen or digits
-    if (text.startsWith('-') || RegExp(r'^[0-9]').hasMatch(text)) {
-      text = text.replaceAll(RegExp(r'^[^A-Z]+'), '');
-    }
-
-    if (text.contains('-')) {
-      final parts = text.split('-');
-      final letters = parts[0].replaceAll(RegExp(r'[^A-Z]'), '');
-      final limitedLetters = letters.length > 3
-          ? letters.substring(0, 3)
-          : letters;
-
-      final numbers = parts
-          .sublist(1)
-          .join('')
-          .replaceAll(RegExp(r'[^0-9]'), '');
-      final limitedNumbers = numbers.length > 4
-          ? numbers.substring(0, 4)
-          : numbers;
-
-      text = '$limitedLetters-$limitedNumbers';
-    } else {
-      if (text.length > 3) {
-        final letters = text.substring(0, 3).replaceAll(RegExp(r'[^A-Z]'), '');
-        final rest = text.substring(3).replaceAll(RegExp(r'[^0-9]'), '');
-        final limitedNumbers = rest.length > 4 ? rest.substring(0, 4) : rest;
-        if (letters.length == 3) {
-          text = '$letters-$limitedNumbers';
-        } else {
-          text = letters;
-        }
-      } else {
-        text = text.replaceAll(RegExp(r'[^A-Z]'), '');
-      }
-    }
-
-    if (text.length > 8) {
-      text = text.substring(0, 8);
-    }
+    final text = newValue.text.toUpperCase().replaceAll(RegExp(r'\s+'), '');
+    if (text.length > 12) return oldValue;
 
     return TextEditingValue(
       text: text,

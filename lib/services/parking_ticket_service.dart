@@ -20,6 +20,7 @@ class ParkingTicketService {
   Future<String> createVehicleEntry({
     required String vehicleCategory,
     required String vehicleNumber,
+    bool isManualPlate = false,
     String driverName = '',
     String phoneNumber = '',
     String notes = 'clear',
@@ -32,12 +33,16 @@ class ParkingTicketService {
 
     final operatorId = user.uid;
 
-    // Vehicle number must strictly follow ABC-123 or ABC-1234
-    final cleanPlate = vehicleNumber.trim().toUpperCase();
-    final plateRegex = RegExp(r'^[A-Z]{3}-\d{3,4}$');
-    if (!plateRegex.hasMatch(cleanPlate)) {
+    // Enforce the basic safe character and length rules. Format expectations
+    // are handled as a soft confirmation in the operator check-in screen.
+    final cleanPlate = vehicleNumber
+        .toUpperCase()
+        .replaceAll(RegExp(r'\s+'), '');
+    if (cleanPlate.length < 3 ||
+        cleanPlate.length > 12 ||
+        !RegExp(r'^[A-Z0-9-]+$').hasMatch(cleanPlate)) {
       throw Exception(
-        'Vehicle number must follow the format ABC-123 or ABC-1234 (e.g. ABC-123 or ABC-1234).',
+        'Vehicle number must be 3–12 characters using capital letters, numbers, and dashes.',
       );
     }
 
@@ -52,6 +57,7 @@ class ParkingTicketService {
     final int locationNumericId;
     final String locationName;
     final int graceTimeSeconds;
+    final int extraGraceTimeMinutes;
     final double parkingCharges;
     final String entryOperatorName;
 
@@ -67,6 +73,7 @@ class ParkingTicketService {
       locationNumericId = cache.locationNumericId;
       locationName = cache.locationName ?? '';
       graceTimeSeconds = cache.graceTimeSeconds;
+      extraGraceTimeMinutes = cache.extraGraceTimeMinutes;
       parkingCharges = cache.parkingCharges.toDouble();
       entryOperatorName = cache.operatorName ?? '';
     } else {
@@ -134,6 +141,7 @@ class ParkingTicketService {
 
       locationName = locationData['locationName']?.toString() ?? '';
       graceTimeSeconds = _toInt(locationData['graceTimeSeconds']);
+      extraGraceTimeMinutes = _toInt(locationData['extraGraceTimeMinutes']);
       parkingCharges = _toDouble(locationData['parkingCharges']);
     }
 
@@ -195,6 +203,7 @@ class ParkingTicketService {
       'ticketNumber': ticketNumber,
       'vehicleCategory': vehicleCategory,
       'vehicleNumber': cleanPlate,
+      'plateReviewStatus': isManualPlate ? 'manual' : 'standard',
       'driverName': driverName.trim(),
       'phoneNumber': phoneNumber.trim(),
       'notes': notes.trim().isEmpty ? 'clear' : notes.trim(),
@@ -209,6 +218,7 @@ class ParkingTicketService {
       'startTime': FieldValue.serverTimestamp(),
       'endTime': null,
       'graceTimeSeconds': graceTimeSeconds,
+      'extraGraceTimeMinutes': extraGraceTimeMinutes,
       'parkingCharges': parkingCharges,
       'charges': 0.0,
       'status': 'in',

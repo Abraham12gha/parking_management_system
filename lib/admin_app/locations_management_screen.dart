@@ -470,6 +470,9 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
     final chargesCtrl = TextEditingController(
       text: location.parkingCharges.toString(),
     );
+    final extraGraceCtrl = TextEditingController(
+      text: location.extraGraceTimeMinutes.toString(),
+    );
     int hours = location.graceTimeSeconds ~/ 3600;
     int mins = (location.graceTimeSeconds % 3600) ~/ 60;
     final formKey = GlobalKey<FormState>();
@@ -547,6 +550,23 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                 ? 'Enter valid rate'
                                 : null,
                           ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: extraGraceCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Extra grace per hour (minutes)',
+                              helperText:
+                                  'Applies to cars checked in after saving. Cars already parked keep their saved rate and grace.',
+                              prefixIcon: Icon(Icons.more_time),
+                            ),
+                            validator: (v) {
+                              final minutes = int.tryParse(v?.trim() ?? '');
+                              return minutes == null || minutes < 0 || minutes > 59
+                                  ? 'Enter a value from 0 to 59 minutes'
+                                  : null;
+                            },
+                          ),
                           const SizedBox(height: 16),
                           Text(
                             'Grace Period:',
@@ -616,6 +636,7 @@ class _LocationsManagementScreenState extends State<LocationsManagementScreen> {
                                       chargesCtrl.text.trim(),
                                     ),
                                     graceTimeSeconds: totalSec,
+                                    extraGraceTimeMinutes: int.parse(extraGraceCtrl.text.trim()),
                                   );
                                   if (mounted) {
                                     AppToast.success(

@@ -14,6 +14,7 @@ class LocationService {
     required String address,
     required int parkingCharges,
     required int graceTimeSeconds,
+    int extraGraceTimeMinutes = 0,
   }) async {
     try {
       final locationsRef = TenantContext.instance.collection(
@@ -47,6 +48,7 @@ class LocationService {
         'address': address,
         'parkingCharges': parkingCharges,
         'graceTimeSeconds': graceTimeSeconds,
+        'extraGraceTimeMinutes': extraGraceTimeMinutes,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -90,6 +92,7 @@ class LocationService {
     required String address,
     required int parkingCharges,
     required int graceTimeSeconds,
+    int extraGraceTimeMinutes = 0,
   }) async {
     try {
       await TenantContext.instance
@@ -100,6 +103,7 @@ class LocationService {
             'address': address,
             'parkingCharges': parkingCharges,
             'graceTimeSeconds': graceTimeSeconds,
+            'extraGraceTimeMinutes': extraGraceTimeMinutes,
             'updatedAt': FieldValue.serverTimestamp(),
           });
     } catch (e) {
