@@ -47,6 +47,14 @@ dependencies:
   sqflite: ^2.4.2
   sqflite_common_ffi: ^2.3.6
   path_provider: ^2.1.5
+  path: ^1.9.1
+  qr_flutter: ^4.1.0
+  universal_barcode_scanner: ^1.6.3
+  flutter_riverpod: ^2.6.1
+  pdf: ^3.12.0
+  # pdf currently caps archive below 4.1.0, while image 4.11.0 requires
+  # archive's newer ZLibDecoder.decodeLazy API. Keep the compatible image release.
+  image: 4.10.2
 
 
 dev_dependencies:
