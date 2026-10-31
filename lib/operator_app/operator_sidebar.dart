@@ -50,19 +50,9 @@ class OperatorSidebar extends StatelessWidget {
       label: 'Reports',
     ),
     SidebarItem(
-      icon: Icons.payments,
-      selectedIcon: Icons.payments,
-      label: 'Payment Methods',
-    ),
-    SidebarItem(
       icon: Icons.bar_chart_outlined,
       selectedIcon: Icons.bar_chart_rounded,
       label: 'Analytics',
-    ),
-    SidebarItem(
-      icon: Icons.backup_outlined,
-      selectedIcon: Icons.backup_outlined,
-      label: 'Backup',
     ),
     SidebarItem(
       icon: Icons.settings_outlined,
