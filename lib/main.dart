@@ -6,6 +6,7 @@ import 'package:parking_management_system/resources/widget/internet_connection_b
 import 'package:firebase_core/firebase_core.dart';
 import 'package:parking_management_system/theme_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'services/app_title_bar.dart';
 import 'services/offline_ticket_store.dart';
@@ -45,7 +46,7 @@ void main() async {
 
   // final auth = Auth();
   // await auth.logoutOnAppStart();
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatefulWidget {
