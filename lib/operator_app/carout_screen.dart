@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:universal_barcode_scanner/universal_barcode_scanner.dart';
 import 'package:flutter/material.dart';
 import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
@@ -33,7 +34,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   Timer? _refreshTimer;
 
   String _searchQuery = '';
-  String _selectedCategory = 'All';
+  String _selectedCategory = 'Regular';
 
   // We store the Firestore document ID instead of the entire object.
   // This guarantees that when Firestore updates, we use the newest data.
@@ -76,7 +77,8 @@ class _CaroutScreenState extends State<CaroutScreen> {
           throw Exception('No authenticated user found.');
         }
 
-        final userSnapshot = await TenantContext.instance.collection('users')
+        final userSnapshot = await TenantContext.instance
+            .collection('users')
             .doc(user.uid)
             .get();
 
@@ -95,7 +97,6 @@ class _CaroutScreenState extends State<CaroutScreen> {
       if (!mounted) return;
 
       final assignedLocationId = locationId;
-      if (assignedLocationId == null || assignedLocationId.isEmpty) return;
       setState(() {
         _userLocationId = assignedLocationId;
         _activeVehiclesStream = _watchActiveVehicles(assignedLocationId);
@@ -116,38 +117,62 @@ class _CaroutScreenState extends State<CaroutScreen> {
     List<_Vehicle> remote = [];
     Future<void> publish() async {
       final local = await OfflineTicketStore.instance.active(locationId);
-      final localVehicles = local.map((data) => _Vehicle.fromFirestore(
-        data['id']?.toString() ?? '', data)).toList();
-      final localIds = await OfflineTicketStore.instance.localTicketIds(locationId);
+      final localVehicles = local
+          .map(
+            (data) =>
+                _Vehicle.fromFirestore(data['id']?.toString() ?? '', data),
+          )
+          .toList();
+      final localIds = await OfflineTicketStore.instance.localTicketIds(
+        locationId,
+      );
       final merged = [
         ...remote.where((v) => !localIds.contains(v.id)),
         ...localVehicles,
       ];
-      merged.sort((a, b) => (b.startTime ?? DateTime(2000)).compareTo(a.startTime ?? DateTime(2000)));
+      merged.sort(
+        (a, b) => (b.startTime ?? DateTime(2000)).compareTo(
+          a.startTime ?? DateTime(2000),
+        ),
+      );
       if (!controller.isClosed) controller.add(merged);
     }
+
     void onLocalChange() => publish();
-    controller = StreamController<List<_Vehicle>>.broadcast(onListen: () {
-      remoteSub = TenantContext.instance.collection('parking_tickets')
-        .where('status', isEqualTo: 'in').where('locationId', isEqualTo: locationId)
-        .snapshots().listen((snapshot) {
-          remote = _mapVehicles(snapshot);
-          if (!snapshot.metadata.isFromCache) {
-            OfflineTicketStore.instance.reconcileServerActive(
-              locationId, snapshot.docs.map((doc) => doc.id).toSet(),
-            );
-          }
-          for (final doc in snapshot.docs) {
-            OfflineTicketStore.instance.cacheRemote(doc.id, locationId, doc.data());
-          }
-          publish();
-        }, onError: (_) => publish());
-      OfflineTicketStore.instance.ticketsRevision.addListener(onLocalChange);
-      publish();
-    }, onCancel: () {
-      remoteSub?.cancel();
-      OfflineTicketStore.instance.ticketsRevision.removeListener(onLocalChange);
-    });
+    controller = StreamController<List<_Vehicle>>.broadcast(
+      onListen: () {
+        remoteSub = TenantContext.instance
+            .collection('parking_tickets')
+            .where('status', isEqualTo: 'in')
+            .where('locationId', isEqualTo: locationId)
+            .snapshots()
+            .listen((snapshot) {
+              remote = _mapVehicles(snapshot);
+              if (!snapshot.metadata.isFromCache) {
+                OfflineTicketStore.instance.reconcileServerActive(
+                  locationId,
+                  snapshot.docs.map((doc) => doc.id).toSet(),
+                );
+              }
+              for (final doc in snapshot.docs) {
+                OfflineTicketStore.instance.cacheRemote(
+                  doc.id,
+                  locationId,
+                  doc.data(),
+                );
+              }
+              publish();
+            }, onError: (_) => publish());
+        OfflineTicketStore.instance.ticketsRevision.addListener(onLocalChange);
+        publish();
+      },
+      onCancel: () {
+        remoteSub?.cancel();
+        OfflineTicketStore.instance.ticketsRevision.removeListener(
+          onLocalChange,
+        );
+      },
+    );
     return controller.stream;
   }
 
@@ -214,9 +239,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
           vehicle.vehicleNumber.toLowerCase().contains(query) ||
           vehicle.ticketNumber.toLowerCase().contains(query);
 
-      final matchesCategory =
-          _selectedCategory == 'All' ||
-          vehicle.category.toLowerCase() == _selectedCategory.toLowerCase();
+      final category = vehicle.category.toLowerCase();
+      final matchesCategory = _selectedCategory == 'Regular'
+          ? category != 'membership'
+          : category == _selectedCategory.toLowerCase();
 
       return matchesSearch && matchesCategory;
     }).toList();
@@ -446,6 +472,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                   child: _buildVehicleSelectionPanel(
                     theme,
                     filteredVehicles,
+                    allVehicles: allVehicles,
                     compact: false,
                   ),
                 ),
@@ -489,6 +516,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
                 _buildVehicleSelectionPanel(
                   theme,
                   filteredVehicles,
+                  allVehicles: allVehicles,
                   compact: true,
                 ),
                 const SizedBox(height: 14),
@@ -617,6 +645,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
   Widget _buildVehicleSelectionPanel(
     ThemeData theme,
     List<_Vehicle> vehicles, {
+    required List<_Vehicle> allVehicles,
     required bool compact,
   }) {
     final colorScheme = theme.colorScheme;
@@ -700,15 +729,25 @@ class _CaroutScreenState extends State<CaroutScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _scanMembershipCard(allVehicles),
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                    label: const Text('Scan membership card'),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _categoryChip(theme, 'All'),
+                      _categoryChip(theme, 'Regular'),
                       _categoryChip(theme, 'Self'),
                       _categoryChip(theme, 'Bike'),
                       _categoryChip(theme, 'Valet'),
+                      _categoryChip(theme, 'Membership'),
                     ],
                   ),
                 ),
@@ -751,6 +790,51 @@ class _CaroutScreenState extends State<CaroutScreen> {
     }
 
     return panel;
+  }
+
+  Future<void> _scanMembershipCard(List<_Vehicle> vehicles) async {
+    try {
+      final code = await UniversalBarcodeScanner.scan(
+        context,
+        cancelButtonText: 'Cancel',
+        barcodeAppBar: const BarcodeAppBar(
+          appBarTitle: 'Scan membership card',
+          enableBackButton: true,
+        ),
+        scanType: ScanType.qr,
+        scanFormat: ScanFormat.onlyQrCode,
+      );
+      if (!mounted || code == null) return;
+      const prefix = 'PARK-MEMBER:';
+      if (!code.startsWith(prefix)) {
+        _showError('This QR code is not a parking membership card.');
+        return;
+      }
+      final membershipId = code.substring(prefix.length).trim();
+      final matches = vehicles.where(
+        (vehicle) =>
+            vehicle.membershipId == membershipId &&
+            vehicle.status.toLowerCase() == 'in',
+      );
+      if (matches.length != 1) {
+        _showError(
+          matches.isEmpty
+              ? 'There is no active visit for this membership. Search by plate to check out manually.'
+              : 'More than one active visit matches this membership. Select the vehicle manually.',
+        );
+        return;
+      }
+      final vehicle = matches.first;
+      setState(() {
+        _selectedVehicleId = vehicle.id;
+        _searchQuery = '';
+        _selectedCategory = 'Membership';
+        _notesController.text = vehicle.notes;
+      });
+      _searchController.clear();
+    } catch (error) {
+      if (mounted) _showError('Could not scan membership card: $error');
+    }
   }
 
   // ===========================================================================
@@ -973,6 +1057,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
       case 'valet':
         return Icons.local_parking_rounded;
+
+      case 'membership':
+        return Icons.card_membership_rounded;
 
       case 'self':
       default:
@@ -1282,9 +1369,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
   Future<void> _saveVehicleNotes(_Vehicle vehicle) async {
     setState(() => _savingNotes = true);
     try {
-      await TenantContext.instance.collection('parking_tickets').doc(vehicle.id).update({
-        'notes': _notesController.text.trim(),
-      });
+      await TenantContext.instance
+          .collection('parking_tickets')
+          .doc(vehicle.id)
+          .update({'notes': _notesController.text.trim()});
       if (mounted)
         AppToast.success(
           context,
@@ -1610,7 +1698,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
                               setDialogState(() {
                                 isProcessing = false;
                               });
-                              _showError('Enter the valet driver name to continue.');
+                              _showError(
+                                'Enter the valet driver name to continue.',
+                              );
                               return;
                             }
 
@@ -1663,10 +1753,14 @@ class _CaroutScreenState extends State<CaroutScreen> {
     _Vehicle vehicle, {
     required String driverName,
   }) async {
-    final originalRef = TenantContext.instance.collection('parking_tickets')
+    final originalRef = TenantContext.instance
+        .collection('parking_tickets')
         .doc(vehicle.id);
 
     try {
+      if (await OfflineTicketStore.instance.ticketIsPending(vehicle.id)) {
+        throw const _OfflineConnectionUnavailable();
+      }
       final connection = await Connectivity().checkConnectivity();
       if (connection.every((item) => item == ConnectivityResult.none)) {
         throw const _OfflineConnectionUnavailable();
@@ -1712,7 +1806,7 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
         final isValet =
             originalData['vehicleCategory']?.toString().toLowerCase() ==
-                'valet';
+            'valet';
         if (isValet && driverName.trim().isEmpty) {
           throw Exception('Enter the valet driver name to continue.');
         }
@@ -1769,7 +1863,9 @@ class _CaroutScreenState extends State<CaroutScreen> {
         if (isValet) {
           // Keep driverName as the entry driver for older reports and clients.
           backupData['entryDriverName'] =
-              originalData['entryDriverName'] ?? originalData['driverName'] ?? '';
+              originalData['entryDriverName'] ??
+              originalData['driverName'] ??
+              '';
           backupData['exitDriverName'] = driverName.trim();
         }
 
@@ -1858,34 +1954,55 @@ class _CaroutScreenState extends State<CaroutScreen> {
     } catch (e) {
       final connection = await Connectivity().checkConnectivity();
       final errorText = e.toString().toLowerCase();
-      final networkFailure = connection.every((item) => item == ConnectivityResult.none) ||
-          errorText.contains('unavailable') || errorText.contains('network') ||
-          errorText.contains('socket') || errorText.contains('deadline-exceeded');
+      final networkFailure =
+          e is _OfflineConnectionUnavailable ||
+          connection.every((item) => item == ConnectivityResult.none) ||
+          errorText.contains('unavailable') ||
+          errorText.contains('network') ||
+          errorText.contains('socket') ||
+          errorText.contains('deadline-exceeded');
       if (networkFailure) {
-        final localTickets = await OfflineTicketStore.instance.active(vehicle.locationId);
-        final matches = localTickets.where((ticket) => ticket['id'] == vehicle.id);
+        final localTickets = await OfflineTicketStore.instance.active(
+          vehicle.locationId,
+        );
+        final matches = localTickets.where(
+          (ticket) => ticket['id'] == vehicle.id,
+        );
         final local = matches.isEmpty ? null : matches.first;
         if (local != null) {
           final data = Map<String, dynamic>.from(local)..remove('id');
           final start = vehicle.startTime ?? DateTime.now();
           final checkout = DateTime.now();
-          final amount = _calculateParkingChargeAtTime(start, vehicle.parkingCharges,
-            vehicle.graceTimeSeconds, vehicle.extraGraceTimeMinutes, checkout);
+          final amount = _calculateParkingChargeAtTime(
+            start,
+            vehicle.parkingCharges,
+            vehicle.graceTimeSeconds,
+            vehicle.extraGraceTimeMinutes,
+            checkout,
+          );
           data.addAll({
-            'status': 'out', 'endTime': checkout.toIso8601String(),
+            'status': 'out',
+            'endTime': checkout.toIso8601String(),
             'checkoutCompletedAt': checkout.toIso8601String(),
-            'checkoutAmount': amount, 'charges': amount,
-            'finalParkingCharges': amount, 'exitDriverName': driverName.trim(),
+            'checkoutAmount': amount,
+            'charges': amount,
+            'finalParkingCharges': amount,
+            'exitDriverName': driverName.trim(),
             'exitOperatorId': _auth.currentUser?.uid ?? '',
             'exitOperatorName': AppDataCache.instance.operatorName ?? '',
             'exitLocationId': vehicle.locationId,
           });
-          await OfflineTicketStore.instance.save(data, id: vehicle.id,
-            locationId: vehicle.locationId);
+          await OfflineTicketStore.instance.save(
+            data,
+            id: vehicle.id,
+            locationId: vehicle.locationId,
+          );
           if (mounted) {
             setState(() => _selectedVehicleId = null);
             _searchController.clear();
-            _showSuccess('${vehicle.vehicleNumber} checked out offline. It will sync when internet returns.');
+            _showSuccess(
+              '${vehicle.vehicleNumber} checked out offline. It will sync when internet returns.',
+            );
           }
           return;
         }
@@ -1991,7 +2108,8 @@ class _CaroutScreenState extends State<CaroutScreen> {
     final extraGraceMicros =
         extraGraceTimeMinutes.clamp(0, 59) * Duration.microsecondsPerMinute;
     final microsPastHourlyDelay = elapsed.inMicroseconds - extraGraceMicros - 1;
-    final additionalCharges = microsPastHourlyDelay < Duration.microsecondsPerHour
+    final additionalCharges =
+        microsPastHourlyDelay < Duration.microsecondsPerHour
         ? 0
         : microsPastHourlyDelay ~/ Duration.microsecondsPerHour;
     return 1 + additionalCharges;
@@ -2365,6 +2483,7 @@ class _Vehicle {
 
   final String locationId;
   final int locationNumericId;
+  final String membershipId;
 
   const _Vehicle({
     required this.id,
@@ -2382,6 +2501,7 @@ class _Vehicle {
     required this.status,
     required this.locationId,
     required this.locationNumericId,
+    this.membershipId = '',
   });
 
   // ===========================================================================
@@ -2430,6 +2550,7 @@ class _Vehicle {
       locationId: data['locationId']?.toString() ?? '',
 
       locationNumericId: _toInt(data['locationNumericId']),
+      membershipId: data['membershipId']?.toString() ?? '',
     );
   }
 
