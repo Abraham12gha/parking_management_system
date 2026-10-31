@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
 import '../services/auth.dart';
+import '../services/offline_ticket_store.dart';
 import '../theme_controller.dart';
 
 class SettingScreenOperator extends StatefulWidget {
@@ -953,6 +954,39 @@ class _SettingScreenOperatorState extends State<SettingScreenOperator> {
                 );
               },
             ),
+          ],
+        ),
+
+        const SizedBox(height: 20),
+
+        _SectionCard(
+          title: 'Offline data',
+          icon: Icons.storage_outlined,
+          children: [
+            ValueListenableBuilder<int>(
+              valueListenable: OfflineTicketStore.instance.pendingCountNotifier,
+              builder: (context, count, _) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.sync),
+                title: Text(count == 0 ? 'All local tickets synced' : '$count ticket(s) waiting to sync'),
+                subtitle: const Text('Pending changes stay on this device until Firebase confirms them.'),
+                trailing: IconButton(
+                  tooltip: 'Sync now',
+                  onPressed: OfflineTicketStore.instance.syncPending,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+            ),
+            FutureBuilder<String>(
+              future: OfflineTicketStore.instance.getDatabaseFilePath(),
+              builder: (context, snapshot) => SelectableText(
+                snapshot.data ?? 'Preparing local SQLite database…',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text('SQLite file on this computer. Copy the path above into File Explorer to locate it.',
+              style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
 
