@@ -3,9 +3,11 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../resources/widget/app_toast.dart';
 import '../services/app_data_cache.dart';
+import '../services/offline_ticket_store.dart';
 
 class CaroutScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -92,13 +94,11 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
       if (!mounted) return;
 
+      final assignedLocationId = locationId;
+      if (assignedLocationId == null || assignedLocationId.isEmpty) return;
       setState(() {
-        _userLocationId = locationId;
-        _activeVehiclesStream = TenantContext.instance.collection('parking_tickets')
-            .where('status', isEqualTo: 'in')
-            .where('locationId', isEqualTo: locationId)
-            .snapshots()
-            .map(_mapVehicles);
+        _userLocationId = assignedLocationId;
+        _activeVehiclesStream = _watchActiveVehicles(assignedLocationId);
         _locationError = null;
       });
     } catch (e) {
@@ -108,6 +108,47 @@ class _CaroutScreenState extends State<CaroutScreen> {
         _locationError = e.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  Stream<List<_Vehicle>> _watchActiveVehicles(String locationId) {
+    late StreamController<List<_Vehicle>> controller;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? remoteSub;
+    List<_Vehicle> remote = [];
+    Future<void> publish() async {
+      final local = await OfflineTicketStore.instance.active(locationId);
+      final localVehicles = local.map((data) => _Vehicle.fromFirestore(
+        data['id']?.toString() ?? '', data)).toList();
+      final localIds = await OfflineTicketStore.instance.localTicketIds(locationId);
+      final merged = [
+        ...remote.where((v) => !localIds.contains(v.id)),
+        ...localVehicles,
+      ];
+      merged.sort((a, b) => (b.startTime ?? DateTime(2000)).compareTo(a.startTime ?? DateTime(2000)));
+      if (!controller.isClosed) controller.add(merged);
+    }
+    void onLocalChange() => publish();
+    controller = StreamController<List<_Vehicle>>.broadcast(onListen: () {
+      remoteSub = TenantContext.instance.collection('parking_tickets')
+        .where('status', isEqualTo: 'in').where('locationId', isEqualTo: locationId)
+        .snapshots().listen((snapshot) {
+          remote = _mapVehicles(snapshot);
+          if (!snapshot.metadata.isFromCache) {
+            OfflineTicketStore.instance.reconcileServerActive(
+              locationId, snapshot.docs.map((doc) => doc.id).toSet(),
+            );
+          }
+          for (final doc in snapshot.docs) {
+            OfflineTicketStore.instance.cacheRemote(doc.id, locationId, doc.data());
+          }
+          publish();
+        }, onError: (_) => publish());
+      OfflineTicketStore.instance.ticketsRevision.addListener(onLocalChange);
+      publish();
+    }, onCancel: () {
+      remoteSub?.cancel();
+      OfflineTicketStore.instance.ticketsRevision.removeListener(onLocalChange);
+    });
+    return controller.stream;
   }
 
   @override
@@ -1626,6 +1667,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
         .doc(vehicle.id);
 
     try {
+      final connection = await Connectivity().checkConnectivity();
+      if (connection.every((item) => item == ConnectivityResult.none)) {
+        throw const _OfflineConnectionUnavailable();
+      }
       await _firestore.runTransaction((transaction) async {
         // --------------------------------------------------------------
         // READ ORIGINAL ACTIVE TICKET
@@ -1811,6 +1856,40 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
       _showSuccess('${vehicle.vehicleNumber} checked out successfully.');
     } catch (e) {
+      final connection = await Connectivity().checkConnectivity();
+      final errorText = e.toString().toLowerCase();
+      final networkFailure = connection.every((item) => item == ConnectivityResult.none) ||
+          errorText.contains('unavailable') || errorText.contains('network') ||
+          errorText.contains('socket') || errorText.contains('deadline-exceeded');
+      if (networkFailure) {
+        final localTickets = await OfflineTicketStore.instance.active(vehicle.locationId);
+        final matches = localTickets.where((ticket) => ticket['id'] == vehicle.id);
+        final local = matches.isEmpty ? null : matches.first;
+        if (local != null) {
+          final data = Map<String, dynamic>.from(local)..remove('id');
+          final start = vehicle.startTime ?? DateTime.now();
+          final checkout = DateTime.now();
+          final amount = _calculateParkingChargeAtTime(start, vehicle.parkingCharges,
+            vehicle.graceTimeSeconds, vehicle.extraGraceTimeMinutes, checkout);
+          data.addAll({
+            'status': 'out', 'endTime': checkout.toIso8601String(),
+            'checkoutCompletedAt': checkout.toIso8601String(),
+            'checkoutAmount': amount, 'charges': amount,
+            'finalParkingCharges': amount, 'exitDriverName': driverName.trim(),
+            'exitOperatorId': _auth.currentUser?.uid ?? '',
+            'exitOperatorName': AppDataCache.instance.operatorName ?? '',
+            'exitLocationId': vehicle.locationId,
+          });
+          await OfflineTicketStore.instance.save(data, id: vehicle.id,
+            locationId: vehicle.locationId);
+          if (mounted) {
+            setState(() => _selectedVehicleId = null);
+            _searchController.clear();
+            _showSuccess('${vehicle.vehicleNumber} checked out offline. It will sync when internet returns.');
+          }
+          return;
+        }
+      }
       if (!mounted) {
         return;
       }
@@ -2251,6 +2330,10 @@ class _CaroutScreenState extends State<CaroutScreen> {
 
     AppToast.error(context, 'Could not release vehicle', message);
   }
+}
+
+class _OfflineConnectionUnavailable implements Exception {
+  const _OfflineConnectionUnavailable();
 }
 
 // =============================================================================
