@@ -40,14 +40,14 @@ class AdminSidebar extends StatelessWidget {
       label: 'Operators',
     ),
     SidebarItem(
+      icon: Icons.card_membership_outlined,
+      selectedIcon: Icons.card_membership,
+      label: 'Memberships',
+    ),
+    SidebarItem(
       icon: Icons.location_on_outlined,
       selectedIcon: Icons.location_on_rounded,
       label: 'Locations',
-    ),
-    SidebarItem(
-      icon: Icons.payments,
-      selectedIcon: Icons.payments,
-      label: 'Payment Methods',
     ),
     SidebarItem(
       icon: Icons.bar_chart_outlined,
