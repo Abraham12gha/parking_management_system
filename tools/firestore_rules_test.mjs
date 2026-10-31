@@ -13,6 +13,7 @@ import {
   getDocs,
   query,
   setDoc,
+  Timestamp,
   updateDoc,
   where,
   writeBatch,
@@ -56,6 +57,12 @@ beforeEach(async () => {
       ['companies/companyB/locations/lot-b', { locationName: 'Company B Gate' }],
       ['companies/companyA/parking_tickets/ticket-1', { locationId: 'lot-1', status: 'in' }],
       ['companies/companyA/parking_tickets/ticket-2', { locationId: 'lot-2', status: 'in' }],
+      ['companies/companyA/memberships/member-1', {
+        fullName: 'Test Member', vehicleNumber: 'ABC-123', phoneNumber: '5550100',
+        locationId: 'lot-1', durationMonths: 3, amount: 1200, status: 'active',
+        startsAt: Timestamp.fromDate(new Date(Date.now() - 60_000)),
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + 60_000)),
+      }],
     ];
     for (const [path, value] of records) {
       await setDoc(doc(db, path), value);
@@ -94,6 +101,40 @@ test('operators can query tickets only for their assigned location', async () =>
   );
   await assertSucceeds(getDocs(ownQuery));
   await assertFails(getDocs(otherQuery));
+});
+
+test('operators can read memberships only at their assigned location', async () => {
+  const db = env.authenticatedContext('operatorA').firestore();
+  const ownQuery = query(
+    collection(db, 'companies/companyA/memberships'),
+    where('locationId', '==', 'lot-1'),
+  );
+  const otherQuery = query(
+    collection(db, 'companies/companyA/memberships'),
+    where('locationId', '==', 'lot-2'),
+  );
+  await assertSucceeds(getDoc(doc(db, 'companies/companyA/memberships/member-1')));
+  await assertSucceeds(getDocs(ownQuery));
+  await assertFails(getDocs(otherQuery));
+  await assertFails(setDoc(doc(db, 'companies/companyA/memberships/operator-created'), {
+    fullName: 'Unauthorized', locationId: 'lot-1', status: 'active',
+  }));
+});
+
+test('membership tickets must match a valid member and its gate', async () => {
+  const db = env.authenticatedContext('operatorA').firestore();
+  const validTicket = {
+    locationId: 'lot-1', operatorId: 'operatorA', vehicleCategory: 'membership',
+    membershipId: 'member-1', vehicleNumber: 'ABC-123',
+    startTime: Timestamp.fromDate(new Date()),
+  };
+  await assertSucceeds(setDoc(doc(db, 'companies/companyA/parking_tickets/member-visit'), validTicket));
+  await assertFails(setDoc(doc(db, 'companies/companyA/parking_tickets/wrong-plate'), {
+    ...validTicket, vehicleNumber: 'XYZ-987',
+  }));
+  await assertFails(setDoc(doc(db, 'companies/companyA/parking_tickets/wrong-gate'), {
+    ...validTicket, locationId: 'lot-2',
+  }));
 });
 
 test('unauthenticated users and users without tenant membership get no data', async () => {
