@@ -8,6 +8,7 @@ import 'package:parking_management_system/theme_controller.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:window_manager/window_manager.dart';
 import 'services/app_title_bar.dart';
+import 'services/offline_ticket_store.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -19,6 +20,7 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
+  OfflineTicketStore.instance.startSyncListener();
 
   final isDesktop =
       !kIsWeb &&
