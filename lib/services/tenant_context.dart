@@ -13,11 +13,13 @@ class TenantContext {
   String? _role;
   String? _uid;
   String? _companyStatus;
+  String? _locationId;
 
   String? get companyId => _companyId;
   String? get role => _role;
   String? get uid => _uid;
   String? get companyStatus => _companyStatus;
+  String? get locationId => _locationId;
   bool get isReady => _companyId != null && _uid != null;
 
   CollectionReference<Map<String, dynamic>> get _tenantIndex =>
@@ -56,7 +58,12 @@ class TenantContext {
         .get();
     final companyStatus = company.data()?['status']?.toString();
     if (!company.exists ||
-        !const {'pending', 'active', 'suspended', 'expired'}.contains(companyStatus)) {
+        !const {
+          'pending',
+          'active',
+          'suspended',
+          'expired',
+        }.contains(companyStatus)) {
       throw StateError('This company has an invalid status.');
     }
     if (status != 'active') {
@@ -67,6 +74,7 @@ class TenantContext {
     _companyId = companyId;
     _role = role;
     _companyStatus = companyStatus;
+    _locationId = data['location']?.toString();
   }
 
   CollectionReference<Map<String, dynamic>> collection(
@@ -101,6 +109,7 @@ class TenantContext {
     _companyId = null;
     _role = null;
     _companyStatus = null;
+    _locationId = null;
   }
 
   /// Starts a company account and its first admin membership atomically.
@@ -150,5 +159,6 @@ class TenantContext {
     _companyId = companyRef.id;
     _role = 'admin';
     _companyStatus = 'pending';
+    _locationId = null;
   }
 }
