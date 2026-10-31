@@ -10,3 +10,14 @@ Future<String> downloadReport(String filename, String contents) async {
   await file.writeAsString(contents, flush: true);
   return file.path;
 }
+
+Future<String> downloadReportBytes(String filename, List<int> contents) async {
+  final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+  final downloads = home == null ? null : Directory('$home${Platform.pathSeparator}Downloads');
+  final directory = downloads != null && await downloads.exists()
+      ? downloads
+      : Directory.systemTemp;
+  final file = File('${directory.path}${Platform.pathSeparator}$filename');
+  await file.writeAsBytes(contents, flush: true);
+  return file.path;
+}
