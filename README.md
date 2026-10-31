@@ -36,6 +36,8 @@ Monthly and yearly plans are recorded in the app as an offline workflow. **There
 - Flutter / Dart
 - Firebase Authentication
 - Cloud Firestore and Firestore Security Rules
+- SQLite local ticket storage and a retryable Firebase sync queue for native apps
+- `connectivity_plus` for network-change detection and sync retries
 - Cloudinary unsigned image uploads for company branding
 - Firebase Emulator Suite for local Firestore rules verification
 
@@ -76,6 +78,14 @@ The repository contains Firebase client configuration in `lib/firebase_options.d
 5. Configure the existing Cloudinary unsigned upload preset to accept a `folder` parameter. Company branding uploads use `companies/{companyId}/branding`.
 
 Read [the free-tier tenant setup guide](docs/FREE_TENANT_SETUP.md) before setting up a new project or migrating existing flat Firestore data. The migration script defaults to a dry run and preserves source documents.
+
+## Offline operator workflow
+
+On native desktop and mobile builds, vehicle check-ins are saved to a local SQLite database before the operator receives confirmation. Check-outs are also stored locally when the active ticket is available on the device. The app retries queued ticket writes when connectivity returns and periodically while online. A ticket created offline gets a temporary `PENDING-…` number; Firebase assigns its regular ticket number during sync.
+
+Open **Operator Settings → Offline data** to see the SQLite file path and the number of tickets waiting for server confirmation. On Windows, the database is stored in the app's per-user application support folder, outside the project directory. The exact path is shown in the app. You can inspect the file with a SQLite database viewer; avoid deleting or editing it while tickets are waiting to sync.
+
+Offline work depends on the signed-in operator, company/location settings, and active ticket data having been loaded on that device. The SQLite queue is implemented for native builds; browser builds do not use this SQLite queue.
 
 ## Tenant data model
 
