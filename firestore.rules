@@ -74,6 +74,20 @@ service cloud.firestore {
           && get(memberPath(companyId, request.auth.uid)).data.role == 'operator';
     }
 
+    function validMembershipTicket(companyId) {
+      return request.resource.data.vehicleCategory != 'membership'
+          || (request.resource.data.membershipId is string
+              && exists(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId))
+              && (get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.status == 'active'
+                  || (get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.status == 'inactive'
+                      && get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.deactivatedAt is timestamp
+                      && request.resource.data.startTime < get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.deactivatedAt))
+              && get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.locationId == request.resource.data.locationId
+              && get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.vehicleNumber == request.resource.data.vehicleNumber
+              && get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.startsAt <= request.resource.data.startTime
+              && get(/databases/$(database)/documents/companies/$(companyId)/memberships/$(request.resource.data.membershipId)).data.expiresAt > request.resource.data.startTime);
+    }
+
     // Expired admins are blocked from business data, but can still request a
     // renewal so the platform owner is not a single point of operational lockout.
     function isTenantAdminRegardlessOfCompanyStatus(companyId) {
@@ -273,6 +287,29 @@ service cloud.firestore {
         allow read, write: if isAdmin(companyId) || isOperator(companyId);
       }
 
+      match /memberships/{membershipId} {
+        allow read: if isAdmin(companyId)
+            || (isOperator(companyId)
+                && (resource == null
+                    || resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location));
+        allow create: if isAdmin(companyId)
+            && request.resource.data.locationId is string
+            && request.resource.data.fullName is string
+            && request.resource.data.vehicleNumber is string
+            && request.resource.data.phoneNumber is string
+            && request.resource.data.durationMonths is int
+            && request.resource.data.durationMonths > 0
+            && request.resource.data.amount is number
+            && request.resource.data.amount >= 0
+            && request.resource.data.status in ['active', 'inactive'];
+        allow update: if isAdmin(companyId)
+            && request.resource.data.locationId == resource.data.locationId
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'updatedAt', 'deactivatedAt'])
+            && request.resource.data.status in ['active', 'inactive'];
+        allow delete: if false;
+      }
+
       match /parking_tickets/{ticketId} {
         allow read: if isAdmin(companyId)
             || (isOperator(companyId)
@@ -280,11 +317,13 @@ service cloud.firestore {
         allow create: if isAdmin(companyId)
             || (isOperator(companyId)
                 && request.resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location
-                && request.resource.data.operatorId == request.auth.uid);
+                && request.resource.data.operatorId == request.auth.uid
+                && validMembershipTicket(companyId));
         allow update: if isAdmin(companyId)
             || (isOperator(companyId)
                 && resource.data.locationId == get(memberPath(companyId, request.auth.uid)).data.location
-                && request.resource.data.locationId == resource.data.locationId);
+                && request.resource.data.locationId == resource.data.locationId
+                && validMembershipTicket(companyId));
         allow delete: if isAdmin(companyId);
       }
 
