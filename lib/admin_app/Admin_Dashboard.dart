@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:parking_management_system/admin_app/add_operator_admin.dart';
 import 'package:parking_management_system/admin_app/settings_admin.dart';
+import 'package:parking_management_system/admin_app/memberships_screen.dart';
 import '../resources/widget/app_toast.dart';
 import '../operator_app/analytics_screen.dart';
 import '../operator_app/reports_screen.dart';
@@ -31,8 +32,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   static const List<String> _titles = [
     'Dashboard',
     'Operator',
+    'Memberships',
     'Locations',
-    'Payment',
     'Analytics',
     'Reports',
     'Settings',
@@ -55,11 +56,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       },
     ),
 
+    const MembershipsScreen(),
+
     const LocationsManagementScreen(),
-    const _PlaceholderPage(
-      icon: Icons.payments_outlined,
-      label: 'Payment Methods',
-    ),
     const AnalyticsScreen(
       locationIdOverride: 'ALL',
       locationNameOverride: 'All Locations (System-Wide)',
@@ -180,42 +179,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         );
       },
-    );
-  }
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 42, color: colorScheme.primary),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '$label content goes here',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
