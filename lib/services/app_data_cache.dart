@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../app_model/parking_ticket_model.dart';
 import 'offline_ticket_store.dart';
+import 'membership_service.dart';
 
 /// Central high-performance cache and real-time synchronization service.
 /// Eliminates redundant Firestore reads and ensures instant propagation of
@@ -109,6 +110,9 @@ class AppDataCache {
 
       if (locId != null && locId.isNotEmpty) {
         _locationId = locId;
+        if (_userRole == 'operator') {
+          MembershipService.instance.preloadLocation(locId);
+        }
 
         // 2. Fetch & attach real-time listener to location doc
         await _attachLocationListener(locId);
@@ -382,6 +386,7 @@ class AppDataCache {
   }
 
   void clear() {
+    MembershipService.instance.stopLocationPreloads();
     _operatorId = null;
     _operatorName = null;
     _locationId = null;
