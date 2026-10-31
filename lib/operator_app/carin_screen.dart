@@ -137,22 +137,10 @@ class _CarinScreenState extends State<CarinScreen> {
 
       if (!mounted) return;
 
-      String? ticketNumber;
-      try {
-        final ticket = await TenantContext.instance.collection('parking_tickets')
-            .doc(ticketId)
-            .get();
-        ticketNumber = ticket.data()?['ticketNumber']?.toString();
-      } catch (_) {
-        // The vehicle entry is already saved; a display lookup must not undo it.
-      }
-      if (!mounted) return;
       AppToast.success(
         context,
         'Vehicle checked in',
-        ticketNumber?.isNotEmpty == true
-            ? 'Ticket ${ticketNumber!} is ready.'
-            : 'Vehicle entry saved successfully.',
+        'Ticket saved on this device. Firebase sync will complete in the background.',
       );
 
       widget.onBack();
