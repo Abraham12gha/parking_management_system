@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'app_data_cache.dart';
+import 'offline_ticket_store.dart';
 
 class ParkingTicketService {
   final FirebaseFirestore _firestore;
@@ -145,62 +146,18 @@ class ParkingTicketService {
       parkingCharges = _toDouble(locationData['parkingCharges']);
     }
 
-    // ------------------------------------------------------------
-    // 2. Generate date information
-    // ------------------------------------------------------------
+    // A local duplicate guard protects the operator even if Firestore's
+    // listener has not yet received an earlier offline entry.
+    if (await OfflineTicketStore.instance.isPlateActive(locationId, cleanPlate)) {
+      throw Exception('This vehicle is already inside this parking location.');
+    }
+
+    // Save locally before acknowledging the operator. Firebase writes and
+    // ticket serial allocation happen in the background retry queue.
     final now = DateTime.now();
-    final counterDate = DateFormat('yyyy-MM-dd').format(now);
-    final ticketDate = '${now.day}${now.month}';
-    final locationCode = locationNumericId.toString().padLeft(2, '0');
-
-    // ------------------------------------------------------------
-    // 3. Generate daily serial atomically
-    // ------------------------------------------------------------
-    final counterRef = TenantContext.instance
-        .collection('counters', firestore: _firestore)
-        .doc('${locationCode}_$counterDate');
-
-    final int serial = await _firestore.runTransaction<int>((
-      transaction,
-    ) async {
-      final counterSnapshot = await transaction.get(counterRef);
-
-      int nextSerial = 1;
-
-      if (counterSnapshot.exists) {
-        final data = counterSnapshot.data();
-        final lastSerial = data?['lastSerial'];
-
-        if (lastSerial is int) {
-          nextSerial = lastSerial + 1;
-        } else if (lastSerial != null) {
-          nextSerial = int.tryParse(lastSerial.toString()) ?? 1;
-          nextSerial += 1;
-        }
-      }
-
-      transaction.set(counterRef, {
-        'lastSerial': nextSerial,
-        'date': counterDate,
-        'locationCode': locationCode,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      return nextSerial;
-    });
-
-    final serialString = serial.toString().padLeft(4, '0');
-    final ticketNumber = 'PVS#$locationCode$ticketDate$serialString';
-
-    // ------------------------------------------------------------
-    // 4. Create parking ticket document
-    // ------------------------------------------------------------
-    final ticketRef = TenantContext.instance
-        .collection('parking_tickets', firestore: _firestore)
-        .doc();
-
-    await ticketRef.set({
-      'ticketNumber': ticketNumber,
+    final id = OfflineTicketStore.instance.newId();
+    await OfflineTicketStore.instance.save({
+      'ticketNumber': 'PENDING-${now.millisecondsSinceEpoch}',
       'vehicleCategory': vehicleCategory,
       'vehicleNumber': cleanPlate,
       'plateReviewStatus': isManualPlate ? 'manual' : 'standard',
@@ -211,23 +168,25 @@ class ParkingTicketService {
       'locationNumericId': locationNumericId,
       'locationName': locationName,
       'operatorId': operatorId,
+      '_tenantCompanyId': TenantContext.instance.companyId,
       'entryOperatorId': operatorId,
       'entryOperatorName': entryOperatorName,
       'exitOperatorId': '',
       'exitOperatorName': '',
-      'startTime': FieldValue.serverTimestamp(),
+      'startTime': now.toIso8601String(),
       'endTime': null,
       'graceTimeSeconds': graceTimeSeconds,
       'extraGraceTimeMinutes': extraGraceTimeMinutes,
       'parkingCharges': parkingCharges,
       'charges': 0.0,
       'status': 'in',
-      'date': counterDate,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    return ticketRef.id;
+      'date': DateFormat('yyyy-MM-dd').format(now),
+      'createdAt': now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
+      '_startIso': now.toIso8601String(),
+    }, id: id, locationId: locationId);
+    OfflineTicketStore.instance.syncPending();
+    return id;
   }
 
   int _toInt(dynamic value) {
