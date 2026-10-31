@@ -1,14 +1,15 @@
-import '../services/tenant_context.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:universal_barcode_scanner/universal_barcode_scanner.dart';
 
 import '../resources/widget/app_toast.dart';
 import '../services/parking_charges_service.dart';
 import '../services/parking_ticket_service.dart';
+import '../services/app_data_cache.dart';
+import '../services/membership_service.dart';
 
-enum VehicleCategory { bike, selfParking, valetParking }
+enum VehicleCategory { bike, selfParking, valetParking, membership }
 
 class CarinScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -41,6 +42,58 @@ class _CarinScreenState extends State<CarinScreen> {
   }
 
   bool _isSaving = false;
+  bool _isLookingUpMember = false;
+
+  Future<void> _scanMemberCard() async {
+    try {
+      final code = await UniversalBarcodeScanner.scan(
+        context,
+        cancelButtonText: 'Cancel',
+        barcodeAppBar: const BarcodeAppBar(
+          appBarTitle: 'Scan membership card',
+          enableBackButton: true,
+        ),
+        scanType: ScanType.qr,
+        scanFormat: ScanFormat.onlyQrCode,
+      );
+      if (!mounted || code == null) return;
+      const prefix = 'PARK-MEMBER:';
+      if (!code.startsWith(prefix)) {
+        AppToast.warning(
+          context,
+          'Invalid membership card',
+          'This QR code is not a parking membership.',
+        );
+        return;
+      }
+      setState(() => _isLookingUpMember = true);
+      final member = await MembershipService.instance.getMembership(
+        code.substring(prefix.length).trim(),
+      );
+      if (!mounted) return;
+      if (member == null ||
+          member.locationId != AppDataCache.instance.locationId ||
+          !member.isValidAt(DateTime.now())) {
+        AppToast.warning(
+          context,
+          'Membership unavailable',
+          'This card is expired, invalid, or belongs to another parking location.',
+        );
+        return;
+      }
+      setState(() {
+        _selectedCategory = VehicleCategory.membership;
+        _vehicleNumberController.text = member.vehicleNumber;
+        _driverNameController.text = member.fullName;
+        _phoneNumberController.text = member.phoneNumber;
+      });
+    } catch (error) {
+      if (mounted) AppToast.error(context, 'Could not scan card', '$error');
+    } finally {
+      if (mounted) setState(() => _isLookingUpMember = false);
+    }
+  }
+
   Future<void> _generateTicket() async {
     // Vehicle number is mandatory.
     final vehicleNumber = _normalizePlate(_vehicleNumberController.text);
@@ -71,14 +124,17 @@ class _CarinScreenState extends State<CarinScreen> {
 
     final usualFormat = RegExp(r'^[A-Z]{1,4}-\d{2,5}$');
     final yearFormat = RegExp(r'^[A-Z]+-\d{2}-\d+$');
-    final isUnusual = !usualFormat.hasMatch(vehicleNumber) &&
+    final isUnusual =
+        !usualFormat.hasMatch(vehicleNumber) &&
         !yearFormat.hasMatch(vehicleNumber);
     if (isUnusual) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Unusual plate format'),
-          content: Text('“$vehicleNumber” has an unusual format. Continue anyway?'),
+          content: Text(
+            '“$vehicleNumber” has an unusual format. Continue anyway?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -104,6 +160,36 @@ class _CarinScreenState extends State<CarinScreen> {
       return;
     }
 
+    String? membershipId;
+    String? membershipName;
+    if (_selectedCategory == VehicleCategory.membership) {
+      final locationId = AppDataCache.instance.locationId;
+      if (locationId == null || locationId.isEmpty) {
+        AppToast.error(
+          context,
+          'Membership unavailable',
+          'The operator location is not loaded.',
+        );
+        return;
+      }
+      final membership = await MembershipService.instance
+          .findValidMembershipForVehicle(
+            locationId: locationId,
+            vehicleNumber: vehicleNumber,
+          );
+      if (!mounted) return;
+      if (membership == null) {
+        AppToast.warning(
+          context,
+          'No valid membership',
+          'No unexpired membership matches this vehicle at this location.',
+        );
+        return;
+      }
+      membershipId = membership.id;
+      membershipName = membership.fullName;
+    }
+
     String vehicleCategory;
 
     switch (_selectedCategory) {
@@ -118,6 +204,10 @@ class _CarinScreenState extends State<CarinScreen> {
       case VehicleCategory.valetParking:
         vehicleCategory = 'valet';
         break;
+
+      case VehicleCategory.membership:
+        vehicleCategory = 'membership';
+        break;
     }
 
     try {
@@ -126,13 +216,15 @@ class _CarinScreenState extends State<CarinScreen> {
         _isSaving = true;
       });
 
-      final ticketId = await _parkingTicketService.createVehicleEntry(
+      await _parkingTicketService.createVehicleEntry(
         vehicleCategory: vehicleCategory,
         vehicleNumber: vehicleNumber,
         isManualPlate: isUnusual,
         driverName: _driverNameController.text,
         phoneNumber: _phoneNumberController.text,
         notes: _notesController.text,
+        membershipId: membershipId,
+        membershipName: membershipName,
       );
 
       if (!mounted) return;
@@ -200,6 +292,32 @@ class _CarinScreenState extends State<CarinScreen> {
                               setState(() => _selectedCategory = category);
                             },
                           ),
+                          if (_selectedCategory ==
+                              VehicleCategory.membership) ...[
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: OutlinedButton.icon(
+                                onPressed: _isLookingUpMember || _isSaving
+                                    ? null
+                                    : _scanMemberCard,
+                                icon: _isLookingUpMember
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.qr_code_scanner_rounded),
+                                label: Text(
+                                  _isLookingUpMember
+                                      ? 'Looking up member…'
+                                      : 'Scan member card to fill details',
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           Text(
                             'Vehicle Details',
@@ -222,6 +340,10 @@ class _CarinScreenState extends State<CarinScreen> {
                       onCancel: widget.onBack,
                       onGenerateTicket: _generateTicket,
                       isSaving: _isSaving,
+                      submitLabel:
+                          _selectedCategory == VehicleCategory.membership
+                          ? 'Check In Member'
+                          : 'Generate + Print',
                     ),
                   ],
                 ),
@@ -413,35 +535,51 @@ class _CategorySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _CategoryCard(
-            icon: Icons.two_wheeler,
-            label: 'Bike',
-            isSelected: selected == VehicleCategory.bike,
-            onTap: () => onSelected(VehicleCategory.bike),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 142,
+            child: _CategoryCard(
+              icon: Icons.two_wheeler,
+              label: 'Bike',
+              isSelected: selected == VehicleCategory.bike,
+              onTap: () => onSelected(VehicleCategory.bike),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _CategoryCard(
-            icon: Icons.local_parking,
-            label: 'Self Parking',
-            isSelected: selected == VehicleCategory.selfParking,
-            onTap: () => onSelected(VehicleCategory.selfParking),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 142,
+            child: _CategoryCard(
+              icon: Icons.local_parking,
+              label: 'Self Parking',
+              isSelected: selected == VehicleCategory.selfParking,
+              onTap: () => onSelected(VehicleCategory.selfParking),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _CategoryCard(
-            icon: Icons.directions_car,
-            label: 'Valet Parking',
-            isSelected: selected == VehicleCategory.valetParking,
-            onTap: () => onSelected(VehicleCategory.valetParking),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 142,
+            child: _CategoryCard(
+              icon: Icons.directions_car,
+              label: 'Valet Parking',
+              isSelected: selected == VehicleCategory.valetParking,
+              onTap: () => onSelected(VehicleCategory.valetParking),
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 142,
+            child: _CategoryCard(
+              icon: Icons.card_membership_outlined,
+              label: 'Membership',
+              isSelected: selected == VehicleCategory.membership,
+              onTap: () => onSelected(VehicleCategory.membership),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -543,7 +681,8 @@ class _VehicleDetailsForm extends StatelessWidget {
                 isRequired: true,
                 controller: vehicleNumberController,
                 hintText: 'Enter the plate as shown',
-                helperText: '3–12 characters. Unusual formats can be confirmed.',
+                helperText:
+                    '3–12 characters. Unusual formats can be confirmed.',
                 icon: Icons.badge_outlined,
                 inputFormatters: [LicensePlateFormatter()],
                 textCapitalization: TextCapitalization.characters,
@@ -703,11 +842,13 @@ class _DialogFooter extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onGenerateTicket;
   final bool isSaving;
+  final String submitLabel;
 
   const _DialogFooter({
     required this.onCancel,
     required this.onGenerateTicket,
     required this.isSaving,
+    required this.submitLabel,
   });
 
   @override
@@ -764,7 +905,7 @@ class _DialogFooter extends StatelessWidget {
                     ),
                   )
                 : const Icon(Icons.local_print_shop_outlined, size: 18),
-            label: Text(isSaving ? 'Saving...' : 'Generate + Print'),
+            label: Text(isSaving ? 'Saving...' : submitLabel),
           ),
         ],
       ),
