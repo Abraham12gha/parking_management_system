@@ -44,9 +44,7 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
     'Active Vehicles',
     'Out Cars',
     'Reports',
-    'Payment',
     'Analytics',
-    'Backup',
     'Settings',
   ];
 
@@ -64,9 +62,7 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
       const ActiveVehiclesScreen(),
       const OutCarsScreen(),
       const ReportsScreen(),
-      const _PlaceholderPage(icon: Icons.payment, label: 'Payment'),
       const AnalyticsScreen(),
-      const _PlaceholderPage(icon: Icons.backup, label: 'Backup'),
       const SettingScreenOperator(),
     ];
   }
@@ -74,14 +70,14 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
   void _onItemSelected(int index) {
     // These screens load their report snapshots on mount. Recreate them when
     // opened so a checkout performed elsewhere in the session is reflected.
-    if (index == 2 || index == 3 || index == 5) _reportVersion++;
+    if (index == 2 || index == 3 || index == 4) _reportVersion++;
     if (index == 2) {
       _pages[index] = OutCarsScreen(key: ValueKey('outcars-$_reportVersion'));
     }
     if (index == 3) {
       _pages[index] = ReportsScreen(key: ValueKey('reports-$_reportVersion'));
     }
-    if (index == 5) {
+    if (index == 4) {
       _pages[index] = AnalyticsScreen(
         key: ValueKey('analytics-$_reportVersion'),
       );
@@ -202,42 +198,6 @@ class _OperatorDashboardState extends State<OperatorDashboard> {
           ),
         );
       },
-    );
-  }
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 42, color: colorScheme.primary),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '$label content goes here',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
